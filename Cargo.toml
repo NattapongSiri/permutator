@@ -1,0 +1,11 @@
+[package]
+name = "permutator"
+version = "0.1.0"
+authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
+
+[lib]
+name = "permutator"
+crate-type = ["rlib"]
+
+[dependencies]
+num = "^0.2"
