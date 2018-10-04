@@ -4,10 +4,45 @@ use num::{PrimInt, Unsigned};
 use std::collections::{VecDeque};
 use std::iter::{Product};
 
+/// Calculate all possible cartesian combination size.
+/// It is always equals to size.pow(degree).
+/// # Parameters
+/// - `size` is a size of data to generate a cartesian product
+/// - `degree` is a number of combination of data.
+/// # Examples
+/// ```
+/// use permutator::get_cartesian_size;
+/// 
+/// get_cartesian_size(3, 2); // return 9.
+/// get_cartesian_size(3, 3); // return 27.
+/// ```
+/// # See
+/// [get_cartesian_for](fn.get_cartesian_for.html)
 pub fn get_cartesian_size(size: usize, degree: usize) -> usize {
     size.pow(degree as u32)
 }
 
+/// Get a cartesian product at specific location.
+/// If `objects` is [1, 2, 3] and degree is 2 then 
+/// all possible result is [1, 1], [1, 2], [1, 3],
+/// [2, 1], [2, 2], [2, 3], [3, 1], [3, 2], [3, 3]
+/// 
+/// # Parameters
+/// - `objects` is a slice of an object.
+/// - `degree` is a degree of cartesian size.
+/// - `i` is a specific location to get a combination.
+/// 
+/// # Examples
+/// ```
+/// use permutator::get_cartesian_for;
+/// 
+/// let nums = [1, 2, 3];
+/// get_cartesian_for(&nums, 2, 0); // Return Ok([1, 1])
+/// get_cartesian_for(&nums, 2, 3); // Return Ok([2, 1])
+/// get_cartesian_for(&nums, 2, 8); // Return Ok([3, 3])
+/// get_cartesian_for(&nums, 2, 9); // Return Err("Parameter `i` is out of bound")
+/// get_cartesian_for(&nums, 4, 0); // Return Err("Parameter `degree` cannot be larger than size of objects")
+/// ```
 pub fn get_cartesian_for<T>(objects: &[T], degree: usize, i: usize) -> Result<Vec<&T>, &str> {
     if i >= get_cartesian_size(objects.len(), degree) {
         return Err("Parameter `i` is out of bound")
@@ -30,10 +65,50 @@ pub fn get_cartesian_for<T>(objects: &[T], degree: usize, i: usize) -> Result<Ve
     return Ok(Vec::from(result))
 }
 
-pub fn get_permutation_size(size: usize, r: usize) -> usize {
-    divide_factorial(size, size - r)
+/// Calculate all possible number of permutation.
+/// It's equals to size!/(size - 1).
+/// 
+/// # Parameters
+/// - `size` a size of data set to generate a permutation.
+/// - `degree` number of data set repetition.
+/// 
+/// # Examples
+/// ```
+/// use permutator::get_permutation_size;
+/// 
+/// get_permutation_size(3, 2); // return = 6
+/// get_permutation_size(4, 2); // return = 12
+/// ```
+/// 
+/// # See
+/// [get_permutation_for](fn.get_permutation_for.html)
+pub fn get_permutation_size(size: usize, degree: usize) -> usize {
+    divide_factorial(size, size - degree)
 }
 
+/// Get permutation at specific location.
+/// If `objects` is [1, 2, 3, 4] and `degree` is 2 then 
+/// all possible permutation will be [1, 2], [1, 3],
+/// [1, 4], [2, 1], [2, 3], [2, 4], [3, 1], [3, 2],
+/// [3, 4], [4, 1], [4, 2], [4, 3].
+/// 
+/// # Parameters
+/// - `objects` a set of data that is a based for permutation.
+/// - `degree` number of element per each location.
+/// - `x` is a location to get a permutation
+/// 
+/// # Examples
+/// ```
+/// use permutator::get_permutation_for;
+/// 
+/// let nums = [1, 2, 3, 4];
+/// get_permutation_for(&nums, 2, 0); // return Result([1, 2])
+/// get_permutation_for(&nums, 3, 0); // return Result([1, 2, 3])
+/// get_permutation_for(&nums, 2, 5); // return Result([2, 4])
+/// get_permutation_for(&nums, 2, 11); // return Result([4, 3])
+/// get_permutation_for(&nums, 2, 12); // return Err("parameter x is outside a possible length")
+/// get_permutation_for(&nums, 5, 0); // return Err("Insufficient number of object in parameters objects for given parameter degree")
+/// ```
 pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<Vec<&T>, &str> {
     let mut next_x = x;
     // hold ordered result for purpose of calculating slot
@@ -117,10 +192,27 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
     Ok(result)
 }
 
+/// Calculate factorial from given value.
 pub fn factorial<T>(n: T) -> T where T : PrimInt + Unsigned + Product {
     num::range(T::one(), n + T::one()).product()
 }
 
+/// Calculate factorial for two factorial division.
+/// It'll return 1 if numerator is smaller or equals to denominator.
+/// Otherwise, it'll short circuit the calculation by calculate only
+/// the undivided remainder.
+/// 
+/// # Examples
+/// ```
+/// use permutator::divide_factorial;
+/// 
+/// // calculate 5!/3!
+/// divide_factorial(5, 3); // return 5 * 4 = 20
+/// // calculate 3!/5!
+/// divide_factorial(3, 5); // return 1.
+/// // calculate 5!/5!
+/// divide_factorial(5, 5); // return 1.
+/// ```
 pub fn divide_factorial<T>(numerator: T, denominator: T) -> T where T : PrimInt + Unsigned + Product {
     if numerator < denominator {
         T::one()
@@ -131,6 +223,18 @@ pub fn divide_factorial<T>(numerator: T, denominator: T) -> T where T : PrimInt 
     }
 }
 
+/// Calculate two factorial multiply on each other.
+/// It'll try to reduce calculation time by calculate the
+/// common value only once.
+/// 
+/// # Examples
+/// ```
+/// use permutator::multiply_factorial;
+/// // 5! * 4!
+/// multiply_factorial(5, 4); // calculate 4! and power it by 2 then multiply by 5.
+/// multiply_factorial(4, 5); // perform similar to above step.
+/// multiply_factorial(5, 5); // calculate 5! and power it by 2.
+/// ```
 pub fn multiply_factorial<T>(fact1: T, fact2: T) -> T where T : PrimInt + Unsigned + Product {
     if fact1 < fact2 {
         let common = factorial(fact1);
