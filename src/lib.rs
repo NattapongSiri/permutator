@@ -1,3 +1,5 @@
+//! Generic permutator that can get a combination at any specific point.
+
 extern crate num;
 
 use num::{PrimInt, Unsigned};
