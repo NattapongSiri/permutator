@@ -1,5 +1,8 @@
 [package]
 name = "permutator"
+description = "Generate a permutation from data. Currently support cartesian product and non-repeat permutation."
+keywords = ["cartesian", "permutation", "instant", "specific", "permutations", "point", "location", "combination"]
+license = "BSD 3-Clause License"
 version = "0.1.0"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
 
