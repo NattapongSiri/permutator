@@ -2,7 +2,7 @@
 name = "permutator"
 description = "Get a permutation at any specific index from data. Currently support cartesian product and non-repeat permutation."
 keywords = ["cartesian", "permutation", "permutations", "at", "index"]
-license = "BSD 3-Clause License"
+license = "BSD-3-Clause"
 repository = "https://github.com/NattapongSiri/permutator"
 version = "0.1.0"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
