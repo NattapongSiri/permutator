@@ -16,6 +16,7 @@ It provide 3 structs for this purpose:
 - GosperCombination
 - HeapPermutation
 - KPermutation
+
 All of it has `into_iter` function.
 `GosperCombination` implement `IntoIterator` trait.
 `HeapPermutation` and `KPermutation` implement `Iterator` trait. 
