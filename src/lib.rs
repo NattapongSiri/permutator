@@ -204,14 +204,19 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
     Ok(result)
 }
 
+<<<<<<< HEAD
 /// Generate k-permutation over slice of `d`. For example: d = &[1, 2, 3]; k = 2.
 /// The result will be [1, 2], [2, 1], [1, 3], [3, 1], [2, 3], [3, 2]
+=======
+/// Generate k-permutation over slice of `d`.
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 /// 
 /// The implementation calculate each combination by using
 /// Gospel's algorithm then permute each combination 
 /// use Heap's algorithm.
 /// 
 /// # Examples
+<<<<<<< HEAD
 /// The example below will generate 4-permutation over 6 data items.
 /// The first combination will be used to generate all permutation first.
 /// So the first three result will be [1, 2, 3, 4], [2, 1, 3, 4], [3, 1, 2, 4]
@@ -231,6 +236,15 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
 ///    let timer = Instant::now();
 /// 
 ///    k_permutation(&data, 4, |permuted| {
+=======
+/// ```
+///    use permutator::k_permutation;
+///    use std::time::{Instant};
+///    let data = [1, 2, 3, 4, 5, 6];
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///    k_permutation(&data, 4, |_| {
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 ///        // uncomment line below to print all k-permutation
 ///        // println!("{}:{:?}", counter, permuted);
 ///        counter += 1;
@@ -245,6 +259,7 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
 /// 2. This function take callback function to speed up permutation processing.
 /// It will call the callback right in the middle of Heap's loop then continue 
 /// the loop.
+<<<<<<< HEAD
 /// 3. This function use single thread.
 /// 
 /// # See
@@ -258,6 +273,13 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) w
         return
     }
 
+=======
+/// 
+/// # See
+/// [Gospel's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Combinatorial_number_system#Applications)
+/// [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
+pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) where T : Clone + Debug {
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
     let (mut subset, mut map) = create_k_set(d, k); // utility function to create initial subset
     cb(&subset);
     heap_permutation(&mut subset, |permuted| {
@@ -272,6 +294,7 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) w
     }
 }
 
+<<<<<<< HEAD
 /// Heap's permutation in iterator style implementation.
 /// It provide two way to iterate over the permutation.
 /// - One conform to Iterator trait constraint where each
@@ -547,6 +570,8 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
     }
 }
 
+=======
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 /// Calculate factorial from given value.
 pub fn factorial<T>(n: T) -> T where T : PrimInt + Unsigned + Product {
     num::range(T::one(), n + T::one()).product()
@@ -643,6 +668,7 @@ fn test_get_permutation_for() {
 }
 
 #[test]
+<<<<<<< HEAD
 fn test_heap_permutation_6() {
     let mut data = [1, 2, 3, 4, 5, 6];
     let mut counter = 1;
@@ -666,19 +692,44 @@ fn test_heap_permutation_10() {
     });
 
     assert_eq!(3628800, counter);
+=======
+fn print_heap_permutation_6() {
+    let mut data = [1, 2, 3, 4, 5, 6];
+    println!("{:?}", data);
+    heap_permutation(&mut data, |perm| {
+        println!("{:?}", perm);
+    });
+}
+
+#[test]
+fn print_heap_permutation_5() {
+    let mut data = [1, 2, 3, 4, 5];
+    println!("{:?}", data);
+    heap_permutation(&mut data, |perm| {
+        println!("{:?}", perm);
+    });
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 }
 
 #[test]
 fn test_k_permutation() {
     use std::time::{Instant};
+<<<<<<< HEAD
     let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
     let mut counter = 0;
     let timer = Instant::now();
     k_permutation(&data, 8, |permuted| {
+=======
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    let mut counter = 0;
+    let timer = Instant::now();
+    k_permutation(&data, 10, |_| {
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
         // uncomment line below to print all k-permutation
         // println!("{}:{:?}", counter, permuted);
         counter += 1;
     });
+<<<<<<< HEAD
     assert_eq!(51891840, counter);
 }
 
@@ -699,6 +750,24 @@ fn test_k_permutation() {
 /// It's first k combination of data `d` inside single set.
 fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, u128) {
     let mask = (1 << width) - 1;
+=======
+    println!("Done {} permuted in {:?}", counter, timer.elapsed());
+}
+
+#[test]
+fn test_gosper_combination() {
+    let mut comb = 7;
+
+    for _ in 0..40 {
+        gosper_combination(&mut comb);
+        println!("next_combination is {:b}", comb);
+    }
+
+}
+
+fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, usize) {
+    let mask = (0..width).fold(0, |mut mask, _| {mask <<= 1; mask | 1});
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
     let mut copied_mask = mask;
     let mut i = 0;
     let mut subset = Vec::new();
@@ -712,12 +781,16 @@ fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, u128) {
     (subset, mask)
 }
 
+<<<<<<< HEAD
 /// Swap variable into data k sized data set. It take a pair of k size data set with
 /// associated Gospel's map. It'll then replace all data in set with new combination
 /// map generated by Gospel's algorithm. The replacement is done in place.
 /// The function return `Some(())` to indicate that new combination replacement is done.
 /// If there's no further combination, it'll return `None`.
 fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut u128), d : &'b[T]) -> Option<()> where T : Clone + Debug {
+=======
+fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut usize), d : &'b[T]) -> Option<()> where T : Clone + Debug {
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
     if let Some(_) = gosper_combination(subset_map.1) {
         let mut copied_mask = *subset_map.1;
         let mut i = 0;
@@ -741,6 +814,7 @@ fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut u128), d : &'b[T])
     }
 }
 
+<<<<<<< HEAD
 #[allow(non_snake_case)]
 #[test]
 fn test_HeapPermutation() {
@@ -799,6 +873,8 @@ fn test_HeapPermutationIntoIterator() {
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
 /// for each permutation done on `d`.
+=======
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : Clone {
     let n = d.len();
     let mut c = vec![0; n];
@@ -821,6 +897,7 @@ fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : 
     }
 }
 
+<<<<<<< HEAD
 #[allow(non_snake_case)]
 #[test]
 fn test_GosperCombinationIterator() {
@@ -843,6 +920,9 @@ fn test_GosperCombinationIterator() {
 /// It'll return None when there's no further possible 
 /// combination by given x. 
 fn gosper_combination(x : &mut u128) -> Option<()> {
+=======
+fn gosper_combination(x : &mut usize) -> Option<()> {
+>>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
     let u = *x & x.overflowing_neg().0;
     let v = u + *x;
     if v == 0 {
