@@ -1,13 +1,15 @@
 //! This crate provide generic permutators.
 //! There's a function that can get a combination at any specific point of
 //! lexicographic ordered permutation.
-//! There's k_permutation function to generate all possible permutation.
-//! There's HeapPermutation struct that provide Iterator style permutation
+//! There's [k-permutation](fn.k_permutation.html) function to generate all possible permutation.
+//! There's [KPermutation](struct.KPermutation.html) struct that provide Iterator style to do k-Permutation
+//! over data.
+//! There's [HeapPermutation](struct.HeapPermutation.html) struct that provide Iterator style permutation
 //! iterator.
-//! There's a GosperCombination struct that provide Iterator style combination
+//! There's a [GosperCombination](struct.GosperCombination.html) struct that provide Iterator style combination
 //! iterator.
 //! 
-//! The simplest usage is call [k_permutation](fn.k_permutation.html) function
+//! The simplest usage is call [k_permutation](fn.k_permutation.html) function.
 
 extern crate num;
 
@@ -204,19 +206,14 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
     Ok(result)
 }
 
-<<<<<<< HEAD
 /// Generate k-permutation over slice of `d`. For example: d = &[1, 2, 3]; k = 2.
 /// The result will be [1, 2], [2, 1], [1, 3], [3, 1], [2, 3], [3, 2]
-=======
-/// Generate k-permutation over slice of `d`.
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 /// 
 /// The implementation calculate each combination by using
 /// Gospel's algorithm then permute each combination 
 /// use Heap's algorithm.
 /// 
 /// # Examples
-<<<<<<< HEAD
 /// The example below will generate 4-permutation over 6 data items.
 /// The first combination will be used to generate all permutation first.
 /// So the first three result will be [1, 2, 3, 4], [2, 1, 3, 4], [3, 1, 2, 4]
@@ -236,15 +233,6 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
 ///    let timer = Instant::now();
 /// 
 ///    k_permutation(&data, 4, |permuted| {
-=======
-/// ```
-///    use permutator::k_permutation;
-///    use std::time::{Instant};
-///    let data = [1, 2, 3, 4, 5, 6];
-///    let mut counter = 0;
-///    let timer = Instant::now();
-///    k_permutation(&data, 4, |_| {
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
 ///        // uncomment line below to print all k-permutation
 ///        // println!("{}:{:?}", counter, permuted);
 ///        counter += 1;
@@ -259,7 +247,6 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
 /// 2. This function take callback function to speed up permutation processing.
 /// It will call the callback right in the middle of Heap's loop then continue 
 /// the loop.
-<<<<<<< HEAD
 /// 3. This function use single thread.
 /// 
 /// # See
@@ -273,13 +260,6 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) w
         return
     }
 
-=======
-/// 
-/// # See
-/// [Gospel's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Combinatorial_number_system#Applications)
-/// [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
-pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) where T : Clone + Debug {
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
     let (mut subset, mut map) = create_k_set(d, k); // utility function to create initial subset
     cb(&subset);
     heap_permutation(&mut subset, |permuted| {
@@ -294,7 +274,6 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) w
     }
 }
 
-<<<<<<< HEAD
 /// Heap's permutation in iterator style implementation.
 /// It provide two way to iterate over the permutation.
 /// - One conform to Iterator trait constraint where each
@@ -403,6 +382,14 @@ impl<'a, T> HeapPermutation<'a, T> {
         }
 
         None
+    }
+
+    /// Reset this permutator so calling next will continue
+    /// permutation on current permuted data.
+    /// It will not reset permuted data.
+    pub fn reset(&mut self) {
+        self.i = 0;
+        self.c.iter_mut().for_each(|c| {*c = 0;});
     }
 }
 
@@ -570,8 +557,281 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
     }
 }
 
-=======
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
+/// k-Permutation over data of length n where k must be
+/// less than n.
+/// It'll attempt to permute given data by pick `k` elements
+/// out of data. It use Gosper algorithm to pick the elements.
+/// It then use Heap's algorithm to permute those `k` elements
+/// and return each permutation back to caller.
+/// 
+/// Similar to [HeapPermutation](struct.HeapPermutation.html), 
+/// It provides two style of getting a permuted value.
+/// - Iterator compatible style
+/// - Manual iterative style
+/// 
+/// # Examples
+/// - Iterator style permit using 'for-in' style loop along with
+/// enable usage of functional paradigm over iterator object.
+/// ```
+///    use permutator::KPermutation;
+///    use std::time::Instant;
+///    let data = [1, 2, 3, 4, 5];
+///    let permutator = KPermutation::new(&data, 3);
+///    let mut counter = 0;
+///    // println!("Begin testing KPermutation");
+///    let timer = Instant::now();
+///
+///    for permuted in permutator {
+///        // uncomment a line below to print all permutation.
+///        // println!("{}:{:?}", counter, permuted);
+///        counter += 1;
+///    }
+/// 
+///    // Or simply use functional paradigm of iterator like below
+///    // permutator.into_iter().any(|item| {item == [7, 8, 9]});
+///
+///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+///    assert_eq!(60, counter);
+/// ```
+/// - Manual iterative style which yield higher throughput because it return
+/// a reference to permuted value stored inside this struct.
+/// ```
+///    use permutator::KPermutation;
+///    use std::time::Instant;
+///    let data = [1, 2, 3, 4, 5];
+///    let mut permutator = KPermutation::new(&data, 3);
+///    let mut counter = 0;
+///    // println!("Begin testing KPermutation");
+///    let timer = Instant::now();
+///
+///    while let Some(permuted) = permutator.next() {
+///        // uncomment the line below to print all possible value
+///        // println!("{}:{:?}", counter, permuted);
+///        counter += 1;
+///    }
+///
+///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+///    assert_eq!(60, counter);
+/// ```
+/// 
+/// # Notes
+/// This struct manual iteration performance is about 110% slower than using 
+/// [k-permutation](fn.k_permutation.html) function
+/// while the slowest using Iterator style is about 2300% slower.
+/// The additional functionality provided by this struct is that it can be
+/// pause or completely stop midway while the [k-permutation](fn.k_permutation.html)
+/// need to be run from start to finish only.
+/// 
+/// # Warning
+/// This struct implementation use unsafe code.
+/// This is because inside the `next` function, it require
+/// a share mutable variable on both the Gosper iterator and
+/// Heap permutator. It also require to re-assign the
+/// permutator on first call to `next` which is impossible in current safe Rust.
+/// To do it in safe Rust way, it need to copy the data
+/// which will hurt performance.
+/// 
+/// # See
+/// - [GosperCombination](struct.GoserPermutation.html)
+/// - [HeapPermutation](struct.HeapPermutation.html)
+pub struct KPermutation<'a, T> where T : 'a {
+    permuted : Vec<&'a T>,
+    
+    len : usize,
+
+    combinator : GosperCombination<'a, T>,
+    permutator : Option<HeapPermutation<'a, &'a T>>
+}
+
+impl<'a, T> KPermutation<'a, T> {
+    pub fn new(data : &[T], k : usize) -> KPermutation<T> {
+        let permuted = vec![&data[0]; k];
+        let combinator = GosperCombination::new(data, k);
+        let n = data.len();
+
+        KPermutation {
+            permuted : permuted,
+
+            len : divide_factorial(n, n - k),
+
+            combinator : combinator,
+            permutator : None
+        }
+    }
+
+    /// Consume then return self immediately.
+    /// It permit functional style operation over iterator 
+    /// from borrow object as Rust isn't yet support
+    /// `for _ in borrowed_object` directly.
+    /// It need to be `for _ in borrowed_object.into_iter()`.
+    pub fn into_iter(self) -> Self {
+        self
+    }
+
+    /// Get total number of permutation this KPermutation object
+    /// can permute. It'll be equals to number of possible `next`
+    /// call.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+
+    /// Mimic iterator's `next` function but return a reference to
+    /// current permuted store inside this struct instead of
+    /// create a copy of permuted data like actual `next` function
+    /// implemented in `Iterator` trait.
+    pub fn next(&mut self) -> Option<&[&T]> {
+        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
+            if let Some(ref mut perm) = *permutator {
+                if let Some(_) = perm.next() {
+                    // get next permutation of current permutator
+                    Some(())
+                } else {
+                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                        // now perm suppose to be new permutator.
+                        Some(())
+                    } else {
+                        // all combination permuted
+                        return None;
+                    }
+                }
+            } else {
+                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                    if let Some(_) = *permutator {
+                        Some(())
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
+            if let Some(_) = combinator.next(&mut *permuted) {
+                if let Some(ref mut permutator) = *permutator {
+                    permutator.reset(); // fresh new permutator
+                    Ok(())
+                } else {
+                    // first time getting a permutator, need to create one.
+                    let new_permutator = HeapPermutation::new(&mut *permuted);
+                    *permutator = Some(new_permutator);
+                    Ok(())
+                }
+            } else {
+                Err(())
+            }
+        }
+        unsafe {
+            let permutator = &mut self.permutator as *mut Option<HeapPermutation<'a, &'a T>>;
+            let permuted = &mut self.permuted as *mut Vec<&'a T>;
+            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+                return Some(&self.permuted);
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+impl<'a, T> Iterator for KPermutation<'a, T> {
+    type Item = Vec<&'a T>;
+
+    fn next(&mut self) -> Option<Vec<&'a T>> {
+        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
+            if let Some(ref mut perm) = *permutator {
+                if let Some(_) = perm.next() {
+                    // get next permutation of current permutator
+                    Some(())
+                } else {
+                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                        // now perm suppose to be new permutator.
+                        Some(())
+                    } else {
+                        // all combination permuted
+                        return None;
+                    }
+                }
+            } else {
+                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                    if let Some(_) = *permutator {
+                        Some(())
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
+            if let Some(_) = combinator.next(&mut *permuted) {
+                if let Some(ref mut permutator) = *permutator {
+                    permutator.reset(); // fresh new permutator
+                    Ok(())
+                } else {
+                    // first time getting a permutator, need to create one.
+                    let new_permutator = HeapPermutation::new(&mut *permuted);
+                    *permutator = Some(new_permutator);
+                    Ok(())
+                }
+            } else {
+                Err(())
+            }
+        }
+        unsafe {
+            let permutator = &mut self.permutator as *mut Option<HeapPermutation<'a, &'a T>>;
+            let permuted = &mut self.permuted as *mut Vec<&'a T>;
+            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+                return Some(self.permuted.to_vec());
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+/// Heap permutation which permutate variable `d` in place and call `cb` function
+/// for each permutation done on `d`.
+fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : Clone {
+    let n = d.len();
+    let mut c = vec![0; n];
+    let mut i = 0;
+    while i < n {
+        if c[i] < i {
+            if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
+                d.swap(0, i);
+            } else {
+                d.swap(c[i], i);
+            }
+
+            cb(d);
+            c[i] += 1;
+            i = 0;
+        } else {
+            c[i] = 0;
+            i += 1;
+        }
+    }
+}
+
+/// Generate binary representation of combination inside
+/// usize. It mutate variable in place.
+/// It'll return None when there's no further possible 
+/// combination by given x. 
+fn gosper_combination(x : &mut u128) -> Option<()> {
+    let u = *x & x.overflowing_neg().0;
+    let v = u + *x;
+    if v == 0 {
+        return None
+    }
+    
+    *x = v + (((v ^ *x) / u) >> 2);
+    Some(())
+}
+
 /// Calculate factorial from given value.
 pub fn factorial<T>(n: T) -> T where T : PrimInt + Unsigned + Product {
     num::range(T::one(), n + T::one()).product()
@@ -627,6 +887,55 @@ pub fn multiply_factorial<T>(fact1: T, fact2: T) -> T where T : PrimInt + Unsign
     }
 }
 
+/// Initiate a first combination along with Gospel's map for further
+/// combination calculation.
+/// The name k_set refer to the use case of k-permutation.
+/// It's first k combination of data `d` inside single set.
+fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, u128) {
+    let mask = (1 << width) - 1;
+    let mut copied_mask = mask;
+    let mut i = 0;
+    let mut subset = Vec::new();
+    while copied_mask > 0 {
+        if copied_mask & 1 == 1 {
+            subset.push(&d[i]);
+        }
+        i += 1;
+        copied_mask >>= 1;
+    }
+    (subset, mask)
+}
+
+/// Swap variable into data k sized data set. It take a pair of k size data set with
+/// associated Gospel's map. It'll then replace all data in set with new combination
+/// map generated by Gospel's algorithm. The replacement is done in place.
+/// The function return `Some(())` to indicate that new combination replacement is done.
+/// If there's no further combination, it'll return `None`.
+fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut u128), d : &'b[T]) -> Option<()> where T : Clone + Debug {
+    if let Some(_) = gosper_combination(subset_map.1) {
+        let mut copied_mask = *subset_map.1;
+        let n = d.len();
+        let mut i = 0;
+        let mut j = 0;
+        while copied_mask > 0 && i < n {
+            if copied_mask & 1 == 1 {
+                subset_map.0[j] = &d[i];
+                j += 1;
+            }
+            i += 1;
+            copied_mask >>= 1;
+        }
+
+        if copied_mask > 0 { // mask goes over the length of `d` now.
+            None
+        } else {
+            Some(())
+        }
+    } else {
+        None
+    }
+}
+
 #[test]
 fn test_get_cartesian_for() {
     let words = ["word1", "word2", "word3"];
@@ -668,7 +977,6 @@ fn test_get_permutation_for() {
 }
 
 #[test]
-<<<<<<< HEAD
 fn test_heap_permutation_6() {
     let mut data = [1, 2, 3, 4, 5, 6];
     let mut counter = 1;
@@ -691,45 +999,24 @@ fn test_heap_permutation_10() {
         counter += 1;
     });
 
+    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
     assert_eq!(3628800, counter);
-=======
-fn print_heap_permutation_6() {
-    let mut data = [1, 2, 3, 4, 5, 6];
-    println!("{:?}", data);
-    heap_permutation(&mut data, |perm| {
-        println!("{:?}", perm);
-    });
 }
 
-#[test]
-fn print_heap_permutation_5() {
-    let mut data = [1, 2, 3, 4, 5];
-    println!("{:?}", data);
-    heap_permutation(&mut data, |perm| {
-        println!("{:?}", perm);
-    });
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
-}
-
+#[allow(unused)]
 #[test]
 fn test_k_permutation() {
     use std::time::{Instant};
-<<<<<<< HEAD
     let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
     let mut counter = 0;
     let timer = Instant::now();
     k_permutation(&data, 8, |permuted| {
-=======
-    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    let mut counter = 0;
-    let timer = Instant::now();
-    k_permutation(&data, 10, |_| {
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
         // uncomment line below to print all k-permutation
         // println!("{}:{:?}", counter, permuted);
         counter += 1;
     });
-<<<<<<< HEAD
+
+    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
     assert_eq!(51891840, counter);
 }
 
@@ -744,78 +1031,7 @@ fn test_k_permutation() {
 
 // }
 
-/// Initiate a first combination along with Gospel's map for further
-/// combination calculation.
-/// The name k_set refer to the use case of k-permutation.
-/// It's first k combination of data `d` inside single set.
-fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, u128) {
-    let mask = (1 << width) - 1;
-=======
-    println!("Done {} permuted in {:?}", counter, timer.elapsed());
-}
-
-#[test]
-fn test_gosper_combination() {
-    let mut comb = 7;
-
-    for _ in 0..40 {
-        gosper_combination(&mut comb);
-        println!("next_combination is {:b}", comb);
-    }
-
-}
-
-fn create_k_set<T>(d : &[T], width : usize) -> (Vec<&T>, usize) {
-    let mask = (0..width).fold(0, |mut mask, _| {mask <<= 1; mask | 1});
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
-    let mut copied_mask = mask;
-    let mut i = 0;
-    let mut subset = Vec::new();
-    while copied_mask > 0 {
-        if copied_mask & 1 == 1 {
-            subset.push(&d[i]);
-        }
-        i += 1;
-        copied_mask >>= 1;
-    }
-    (subset, mask)
-}
-
-<<<<<<< HEAD
-/// Swap variable into data k sized data set. It take a pair of k size data set with
-/// associated Gospel's map. It'll then replace all data in set with new combination
-/// map generated by Gospel's algorithm. The replacement is done in place.
-/// The function return `Some(())` to indicate that new combination replacement is done.
-/// If there's no further combination, it'll return `None`.
-fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut u128), d : &'b[T]) -> Option<()> where T : Clone + Debug {
-=======
-fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut usize), d : &'b[T]) -> Option<()> where T : Clone + Debug {
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
-    if let Some(_) = gosper_combination(subset_map.1) {
-        let mut copied_mask = *subset_map.1;
-        let mut i = 0;
-        let mut j = 0;
-        while copied_mask > 0 && i < d.len() {
-            if copied_mask & 1 == 1 {
-                subset_map.0[j] = &d[i];
-                j += 1;
-            }
-            i += 1;
-            copied_mask >>= 1;
-        }
-
-        if copied_mask > 0 { // mask goes over the length of `d` now.
-            None
-        } else {
-            Some(())
-        }
-    } else {
-        None
-    }
-}
-
-<<<<<<< HEAD
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 #[test]
 fn test_HeapPermutation() {
     use std::time::{Instant};
@@ -834,14 +1050,14 @@ fn test_HeapPermutation() {
     assert_eq!(6, counter);
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 #[test]
 fn test_HeapPermutationIterator() {
     use std::time::{Instant};
     let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
     // let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     println!("0:{:?}", data);
-    let mut permutator = HeapPermutation::new(&mut data);
+    let permutator = HeapPermutation::new(&mut data);
     let timer = Instant::now();
     let mut counter = 1;
 
@@ -854,14 +1070,14 @@ fn test_HeapPermutationIterator() {
     assert_eq!(6, counter);
 }
 
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 #[test]
 fn test_HeapPermutationIntoIterator() {
     use std::time::{Instant};
     let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
     // let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     println!("0:{:?}", data);
-    let mut permutator = HeapPermutation::new(&mut data);
+    let permutator = HeapPermutation::new(&mut data);
     let timer = Instant::now();
     let mut counter = 1;
 
@@ -871,34 +1087,7 @@ fn test_HeapPermutationIntoIterator() {
     assert_eq!(6, counter);
 }
 
-/// Heap permutation which permutate variable `d` in place and call `cb` function
-/// for each permutation done on `d`.
-=======
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
-fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : Clone {
-    let n = d.len();
-    let mut c = vec![0; n];
-    let mut i = 0;
-    while i < n {
-        if c[i] < i {
-            if i % 2 == 0 {
-                d.swap(0, i);
-            } else {
-                d.swap(c[i], i);
-            }
-
-            cb(d);
-            c[i] += 1;
-            i = 0;
-        } else {
-            c[i] = 0;
-            i += 1;
-        }
-    }
-}
-
-<<<<<<< HEAD
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 #[test]
 fn test_GosperCombinationIterator() {
     use std::time::{Instant};
@@ -915,20 +1104,40 @@ fn test_GosperCombinationIterator() {
     assert_eq!(10, counter);
 }
 
-/// Generate binary representation of combination inside
-/// usize. It mutate variable in place.
-/// It'll return None when there's no further possible 
-/// combination by given x. 
-fn gosper_combination(x : &mut u128) -> Option<()> {
-=======
-fn gosper_combination(x : &mut usize) -> Option<()> {
->>>>>>> 77d54e63218638ffd7e833be6acaf760c9f74556
-    let u = *x & x.overflowing_neg().0;
-    let v = u + *x;
-    if v == 0 {
-        return None
+#[allow(non_snake_case, unused)]
+#[test]
+fn test_KPermutation() {
+    use std::time::Instant;
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+    let mut permutator = KPermutation::new(&data, 8);
+    let mut counter = 0;
+    // println!("Begin testing KPermutation");
+    let timer = Instant::now();
+
+    while let Some(permuted) = permutator.next() {
+        // println!("{}:{:?}", counter, permuted);
+        counter += 1;
     }
-    
-    *x = v + (((v ^ *x) / u) >> 2);
-    Some(())
+
+    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    assert_eq!(51891840, counter);
+}
+
+#[allow(non_snake_case, unused)]
+#[test]
+fn test_KPermutationIterator() {
+    use std::time::Instant;
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+    let permutator = KPermutation::new(&data, 8);
+    let mut counter = 0;
+    // println!("Begin testing KPermutation");
+    let timer = Instant::now();
+
+    for permuted in permutator {
+        // println!("{}:{:?}", counter, permuted);
+        counter += 1;
+    }
+
+    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    assert_eq!(51891840, counter);
 }
