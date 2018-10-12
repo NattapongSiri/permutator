@@ -7,6 +7,9 @@ It currently provide 2 functions to generate a combination.
 It also provide utilities functions like:
 - get_cartesian_size
 - get_permutation_size
+## Get a cartesian product over multiple sets
+It provide `cartesian_product` function to generate all possible
+cartesian product over multiple sets of data.
 ## Complete permutation over data
 ### Single function, k-permutation with callback on each permutation.
 It provide `k_permutation` function to generate all possible 
@@ -29,6 +32,7 @@ new Vec on returned value but a reference to internal slice of
 permuted value.
 
 # Get a permutation at specific point examples
+To get into 'n' specific lexicographic permutation, 
 ```Rust
 use permutator::get_cartesian_size;
 
@@ -58,6 +62,13 @@ get_permutation_for(&nums, 2, 5); // return Result([2, 4])
 get_permutation_for(&nums, 2, 11); // return Result([4, 3])
 get_permutation_for(&nums, 2, 12); // return Err("parameter x is outside a possible length")
 get_permutation_for(&nums, 5, 0); // return Err("Insufficient number of object in parameters objects for given parameter degree")
+```
+# Cartesian product of multiple sets of data.
+To get cartesian product from 3 set of data.
+```Rust
+    cartesian_product(&[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]], |product| {
+        println!("{:?}", product);
+    });
 ```
 # Combination Iterator examples
 The struct offer two ways to get a combination. 

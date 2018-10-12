@@ -205,6 +205,61 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
     Ok(result)
 }
 
+/// Create a cartesian product over give slice. The result will be a slice
+/// of borrowed `T`. 
+/// 
+/// # Parameters
+/// - `sets` A slice of slice(s) contains `T` elements.
+/// - `cb` A callback function. It will be called on each product.
+/// 
+/// # Return
+/// A function return a slice of borrowed `T` element out of parameter `sets`.
+/// It return value as parameter of callback function `cb`.
+/// 
+/// # Examples
+/// To print all cartesian product between [1, 2, 3] and [4, 5, 6].
+/// ```
+///    use permutator::cartesian_product;
+/// 
+///    cartesian_product(&[&[1, 2, 3], &[4, 5, 6]], |product| {
+///        // First called will receive [1, 4] then [1, 5] then [1, 6]
+///        // then [2, 4] then [2, 5] and so on until [3, 6].
+///        println!("{:?}", product);
+///    });
+/// ```
+pub fn cartesian_product<T>(sets : &[&[T]], mut cb : impl FnMut(&[&T])) {
+    let mut result = vec![&sets[0][0]; sets.len()];
+    let mut more = true;
+    let n = sets.len() - 1;
+    let mut i = 0;
+    let mut c = vec![0; sets.len()];
+    while more {
+        result[i] = &sets[i][c[i]];
+
+        if i == n {
+            c[i] += 1;
+            cb(&result);
+        }
+
+        if i < n {
+            i += 1;
+        }
+
+        while c[i] == sets[i].len() {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
 /// Generate k-permutation over slice of `d`. For example: d = &[1, 2, 3]; k = 2.
 /// The result will be [1, 2], [2, 1], [1, 3], [3, 1], [2, 3], [3, 2]
 /// 
@@ -1178,6 +1233,13 @@ fn test_KPermutationIterator() {
 
     println!("Total {} permutations done in {:?}", counter, timer.elapsed());
     assert_eq!(51891840, counter);
+}
+
+#[test]
+fn test_cartesian_product() {
+    cartesian_product(&[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]], |product| {
+        println!("{:?}", product);
+    });
 }
 
 // #[test]
