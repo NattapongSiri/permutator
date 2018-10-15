@@ -6,10 +6,17 @@
 //! over data.
 //! There's [HeapPermutation](struct.HeapPermutation.html) struct that provide Iterator style permutation
 //! iterator.
+//! There's a [combination](fn.combination.html) function to generate all possible combination.
 //! There's a [GosperCombination](struct.GosperCombination.html) struct that provide Iterator style combination
 //! iterator.
 //! 
-//! The simplest usage is call [k_permutation](fn.k_permutation.html) function.
+//! This crate provides traits that introduce additional functions to `[T]` and `Vec<T>`.
+//! See trait [Permutation](trait.Permutation.html) and trait [Combination](trait.Combination.html)
+//! for more detail.
+//! 
+//! The simplest and most efficient usage is call [combination](fn.combination.html) for
+//! combination, [heap_permutation](fn.heap_permutation.html) for permutation, 
+//! and [k_permutation](fn.k_permutation.html) function for k-permutation.
 
 extern crate num;
 
@@ -260,6 +267,46 @@ pub fn cartesian_product<T>(sets : &[&[T]], mut cb : impl FnMut(&[&T])) {
     }
 }
 
+/// Generate a combination out of given `domain`.
+/// It call `cb` to several times to return each combination.
+/// 
+/// # Parameters
+/// - `domain` is a slice containing the source data, AKA 'domain'
+/// - `r` is a size of each combination, AKA 'range' size
+/// - `cb` is a callback function that will get call several times.
+/// Each call will have a slice of combination pass as callback parameter.
+/// 
+/// # Returns
+/// The function will return combination via callback function. It will
+/// keep calling until no further combination can be found then it
+/// return control to called.
+/// 
+/// # Example
+/// ```
+/// use permutator::combination;
+/// combination(&[1, 2, 3, 4, 5], 3, |c| {
+///     // called multiple times.
+///     // Each call have [1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]
+///     // [1, 2, 5], [1, 3, 5], [2, 3, 5], [1, 4, 5], [2, 4, 5],
+///     // and [3, 4, 5] respectively.
+///     println!("{:?}", c);
+/// });
+/// ```
+/// 
+/// # Limitation
+/// Gosper algorithm need to know the MSB (most significant bit).
+/// The current largest known MSB data type is u128.
+/// This make the implementation support up to 128 elements slice.
+/// 
+pub fn combination<T>(domain: &[T], r : usize, mut cb : impl FnMut(&[&T]) -> ()) {
+    let (mut combination, mut map) = create_k_set(domain, r);
+    cb(&combination);
+
+    while let Some(_) = swap_k((&mut combination, &mut map), domain) {
+        cb(&combination);
+    }
+}
+
 /// Generate k-permutation over slice of `d`. For example: d = &[1, 2, 3]; k = 2.
 /// The result will be [1, 2], [2, 1], [1, 3], [3, 1], [2, 3], [3, 2]
 /// 
@@ -293,6 +340,11 @@ pub fn cartesian_product<T>(sets : &[&[T]], mut cb : impl FnMut(&[&T])) {
 ///    });
 ///    println!("Done {} permuted in {:?}", counter, timer.elapsed());
 ///    ```
+/// 
+/// # Limitation
+/// Gosper algorithm need to know the MSB (most significant bit).
+/// The current largest known MSB data type is u128.
+/// This make the implementation support up to 128 elements slice.
 /// 
 /// # Notes
 /// 1. This function doesn't support jumping into specific nth permutation because
@@ -504,6 +556,11 @@ impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
 ///    println!("Total {} combinations in {:?}", counter, timer.elapsed());
 /// ```
 /// 
+/// # Limitation
+/// Gosper algorithm need to know the MSB (most significant bit).
+/// The current largest known MSB data type is u128.
+/// This make the implementation support up to 128 elements slice.
+/// 
 /// # See
 /// - [Gospel's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Combinatorial_number_system#Applications)
 pub struct GosperCombination<'a, T> where T : 'a {
@@ -668,6 +725,11 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
 ///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
 ///    assert_eq!(60, counter);
 /// ```
+/// 
+/// # Limitation
+/// Gosper algorithm need to know the MSB (most significant bit).
+/// The current largest known MSB data type is u128.
+/// This make the implementation support up to 128 elements slice.
 /// 
 /// # Notes
 /// This struct manual iteration performance is about 110% slower than using 
@@ -850,7 +912,28 @@ impl<'a, T> Iterator for KPermutation<'a, T> {
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
 /// for each permutation done on `d`.
-fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : Clone {
+/// 
+/// # Parameter
+/// - `d` a data to be permuted.
+/// - `cb` a callback function that will be called several times for each permuted value.
+/// 
+/// # Example
+/// ```
+/// use permutator::heap_permutation;
+/// heap_permutation(&mut [1, 2, 3], |p| {
+///     // call multiple times. It'll print [2, 1, 3], [3, 1, 2], 
+///     // [1, 3, 2], [2, 3, 1], and [3, 2, 1] respectively.
+///     println!("{:?}", p);
+/// });
+/// ```
+/// 
+/// # Warning
+/// The permutation is done in place which mean the parameter `d` will be
+/// mutated.
+/// 
+/// # Notes
+/// 1. The value passed to callback function will equals to value inside parameter `d`.
+pub fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) {
     let n = d.len();
     let mut c = vec![0; n];
     let mut i = 0;
@@ -868,6 +951,122 @@ fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) where T : 
         } else {
             c[i] = 0;
             i += 1;
+        }
+    }
+}
+
+/// Create a combination out of `T`
+/// Normally, it take a `[T]` or `Vec<T>` to create a combination.
+/// 
+/// # Example
+/// ```
+/// use permutator::Combination;
+/// let data = [1, 2, 3, 4, 5];
+/// data.combination(3).for_each(|c| {
+///     // called multiple times.
+///     // Each call have [1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4]
+///     // [1, 2, 5], [1, 3, 5], [2, 3, 5], [1, 4, 5], [2, 4, 5],
+///     // and [3, 4, 5] respectively.
+///     println!("{:?}", c);
+/// });
+/// ```
+/// 
+/// See [Example implementation](trait.Combination.html#foreign-impls) on
+/// foreign type.
+pub trait Combination<T> {
+    /// Create a [CombinationIterator](struct.CombinationIterator.html)
+    /// of `k` size out of `self`.
+    /// See [CombinationIterator](struct.CombinationIterator.html) for
+    /// how to use [CombinationIterator](struct.CombinationIterator.html)
+    /// 
+    /// # Return
+    /// A new [CombinationIterator<T>](struct.CombinationIterator.html)
+    fn combination(&self, k : usize) -> CombinationIterator<T>;
+}
+
+impl<T> Combination<T> for [T] {
+    fn combination(&self, k : usize) -> CombinationIterator<T> {
+        let mut x : u128 = 1;
+        x <<= k;
+        x -= 1;
+
+        CombinationIterator {
+            data : self,
+            x : x
+        }
+    }
+}
+
+impl<T> Combination<T> for Vec<T> {
+    fn combination(&self, k : usize) -> CombinationIterator<T> {
+        let mut x : u128 = 1;
+        x = (x << k) - 1;
+        
+        CombinationIterator {
+            data : self,
+            x : x
+        }
+    }
+}
+
+/// Create a permutation iterator that permute data in place.
+/// It return an object of [HeapPermutation](struct.HeapPermutation.html)
+/// which can be used as iterator or manual iterate for higher throughput.
+/// 
+/// # Example
+/// For typical permutation:
+/// ```
+/// use permutator::Permutation;
+/// let mut data = vec![1, 2, 3];
+/// data.permutation().for_each(|p| {
+///     // call multiple times. It'll print [2, 1, 3], [3, 1, 2], 
+///     // [1, 3, 2], [2, 3, 1], and [3, 2, 1] respectively.
+///     println!("{:?}", p);
+/// });
+/// ```
+/// For k-permutation:
+/// ```
+/// use permutator::{Combination, Permutation};
+/// let data = [1, 2, 3, 4, 5];
+/// let k = 3;
+///
+/// data.combination(k).for_each(|mut combination| {
+///     // print the first combination
+///     println!("{:?}", combination);
+///     combination.permutation().for_each(|permuted| {
+///         // print permutation of each combination
+///         println!("{:?}", permuted);
+///     });
+/// });
+/// // All k-permutation printed
+/// ```
+/// 
+/// # See 
+/// - [HeapPermutation](struct.HeapPermutation.html) for more detail
+/// about how to use [HeapPermutation](struct.HeapPermutation.html).
+/// - [Example implementation](trait.Permutation.html#foreign-impls) on foreign type
+pub trait Permutation<T> {
+    /// Create a permutation based on Heap's algorithm.
+    /// It return [HeapPermutation](struct.HeapPermutation.html) object.
+    fn permutation(&mut self) -> HeapPermutation<T>;
+}
+
+impl<T> Permutation<T> for [T] {
+    fn permutation(&mut self) -> HeapPermutation<T> {
+        HeapPermutation {
+            c : vec![0; self.len()],
+            data : self,
+            i : 0
+        }
+    }
+}
+
+impl<T> Permutation<T> for Vec<T> {
+    fn permutation(&mut self) -> HeapPermutation<T> {
+        HeapPermutation {
+            c : vec![0; self.len()],
+            data : self,
+            i : 0
         }
     }
 }
@@ -895,6 +1094,12 @@ fn gosper_combination(x : &mut u128) -> Option<()> {
 /// The different from original Gosper algorithm is
 /// it eliminate divide operation by using built in
 /// trailing_zeros function.
+/// 
+/// # Limitation
+/// Gosper algorithm need to know the MSB (most significant bit).
+/// The current largest known MSB data type is u128.
+/// This make the implementation support up to 128 elements slice.
+/// 
 /// Reference:
 /// - [Compute the lexicographically next bit permutation](http://graphics.stanford.edu/~seander/bithacks.html#NextBitPermutation)
 fn stanford_combination(x: &mut u128) {
@@ -1237,9 +1442,66 @@ fn test_KPermutationIterator() {
 
 #[test]
 fn test_cartesian_product() {
-    cartesian_product(&[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]], |product| {
-        println!("{:?}", product);
+    use std::time::Instant;
+    let set = (1..14).map(|item| item).collect::<Vec<u64>>();
+    let mut data = Vec::<&[u64]>::new();
+    for _ in 0..7 {
+        data.push(&set);
+    }
+
+    let mut counter = 0;
+    let timer = Instant::now();
+
+    cartesian_product(&data, |product| {
+        // println!("{:?}", product);
+        counter += 1;
     });
+
+    println!("Total {} product done in {:?}", counter, timer.elapsed());
+}
+
+#[test]
+fn test_combination_trait() {
+    let data = [1, 2, 3, 4, 5, 6, 7, 8];
+    let k = 3;
+    let mut counter = 0;
+    for combination in data.combination(k) {
+        println!("{:?}", combination);
+        counter += 1;
+    }
+
+    assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+}
+
+#[test]
+fn test_permutation_trait() {
+    let mut data = [1, 2, 3, 4, 5];
+    println!("{:?}", data);
+    let mut counter = 1;
+    for permuted in data.permutation() {
+        println!("{:?}", permuted);
+        counter += 1;
+    }
+
+    assert_eq!(counter, factorial(data.len()));
+}
+
+#[test]
+fn test_k_permutation_primitive() {
+    let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let k = 3;
+    let mut counter = 0;
+
+    data.combination(k).for_each(|mut combination| {
+        println!("{:?}", combination);
+        counter += 1;
+        combination.permutation().for_each(|permuted| {
+            println!("{:?}", permuted);
+            counter += 1;
+        });
+    });
+
+    assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
 }
 
 // #[test]
@@ -1251,3 +1513,17 @@ fn test_cartesian_product() {
 //         stanford_combination(&mut x);
 //     }
 // }
+
+#[test]
+fn test_combination_fn() {
+    let data = [1, 2, 3, 4, 5];
+    let r = 3;
+    let mut counter = 0;
+
+    combination(&data, r, |comb| {
+        println!("{:?}", comb);
+        counter += 1;
+    });
+
+    assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
+}
