@@ -184,7 +184,7 @@ println!("Done {} permutations in {:?}", counter, timer.elapsed());
 ## Traits that add new function to `[T]` or `Vec<T>`
 `Combination` trait add `combination` function.
 The function take 1 parameter. It's a size of combination frame.
-The function return the same Iterator that also return by the [provided struct](#iterator-style-permutations/combinations)
+The function return the same Iterator that also return by the [provided struct](#iterator-style-permutationscombinations)
 ```Rust
 use permutator::Combination;
 let data = [1, 2, 3, 4, 5];
@@ -195,7 +195,7 @@ data.combination(3).for_each(|comb| {
 ```
 `Permutation` trait add `permutation` function.
 It permute the `[T]` or `Vec<T>` in place. 
-The function return the same Iterator that also return by the [provided struct](#iterator-style-permutations/combinations)
+The function return the same Iterator that also return by the [provided struct](#iterator-style-permutationscombinations)
 ```Rust
 use permutator::Permutation;
 let mut data = [1, 2, 3];
