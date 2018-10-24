@@ -1,11 +1,11 @@
 [package]
 name = "permutator"
-description = "Get a permutation at any specific index from data for cartesian product and lexicographic permutation. Generate non-lexicographic k-permutation. Generate cartesian product from multiple set of data"
-documentation = "https://docs.rs/permutator/0.1.2/"
-keywords = ["cartesian", "permutation", "permutations", "subset", "k-permutation"]
+description = "Get a lexicographic cartesian product and lexicographic permutation at any specific index from data. Generate complete lexicographic cartesian product from multiple set of data. Generate complete non-lexicographic combination from data. Generate non-lexicographic k-permutation."
+documentation = "https://docs.rs/permutator/0.1.4/"
+keywords = ["cartesian", "permutation", "combination", "multiple", "k-permutation"]
 license = "BSD-3-Clause"
 repository = "https://github.com/NattapongSiri/permutator"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
 
 [lib]

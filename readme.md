@@ -27,34 +27,122 @@ It also provide utilities functions like:
 - get_cartesian_size
 - get_permutation_size
 ## Get a cartesian product over multiple sets
-It provides `cartesian_product` function to generate all possible
-cartesian product over multiple sets of data.
-## Complete permutation over data
-### Two function, heap_permutation and k_permutation with callback on each permutation.
-It provides `heap_permutation` function to generate all possible permutation
-over data. It also provide `k_permutation` function to generate all possible 
-k-permutation over given data.
-### Iterator style permutations/combinations
-It provides 3 structs for this purpose:
-- GosperCombination
-- HeapPermutation
-- KPermutation
+There are two distinct implementation to get cartesian product.
+- Iterator that return product
+- Function that call callback function to return product
+### Iterator 
+This crate provides `CartesianProduct` struct that implement
+`Iterator` trait. The struct provide 3 use cases.
+- Use Rust builtin `Iterator` functionality.
+- Use `next` function that return borrowed result into mutable slice.
+- use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+### Callback function
+This crate provides 4 functions that serve different usecase.
+- `cartesian_product` function that return product as callback parameter
+- `cartesian_product_cell` function that return product into Rc<RefCell<>> given in function parameter
+- `cartesian_product_sync` function that return product into Arc<RwLock<>> given in function parameter
+- `unsafe_cartesian_product` unsafe function that return product into mutable pointer given in function parameter
+## Get a combination from data
+There are three distinct implementation to get k-combinations of n set.
+- Iterator that return product
+- Trait that add function to slice and Vec
+- Function that call callback function to return product
+### Iterator
+This crate provides `GosperCombination` struct that implement
+`IntoIterator` trait. The struct provide 3 use cases.
+- Use Rust builtin `Iterator` functionality.
+- Use `next` function that return borrowed result into mutable slice.
+- use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+### Trait
+This crate provides `Combination` trait and basic implementation on generic slice and generic Vec.
+It add `combination(usize)` function on the slice and Vec.
+### Callback function
+This crate provide 4 functions that serve different usecase.
+- `combination` function that return product as callback parameter
+- `combination_cell` function that return product into Rc<RefCell<>> given in function parameter
+- `combination_sync` function that return product into Arc<RwLock<>> given in function parameter
+- `unsafe_combination` unsafe function that return product into mutable pointer given in function parameter
+## Get a permutation from data
+There are three distinct implementation to get permutation.
+- Iterator that do permutation on data
+- Trait that add function to slice and Vec
+- Function that call callback function to return a permutation
+### Iterator
+This crate provides `HeapPermutation` struct that implement
+`Iterator` trait. The struct provide 2 use cases.
+- Use Rust builtin `Iterator` functionality.
+- Use `next` function that return borrowed result into mutable slice.
+### Trait
+This crate provides `Permutation` trait and basic implementation on generic slice and generic Vec.
+It add `permutation` function on the slice and Vec.
+### Callback function
+This crate provide 3 functions that serve different usecase.
+- `heap_permutation` function that return product as callback parameter
+- `heap_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
+- `heap_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
+## Get a k-permutation from data
+There are two distinct implementation to get k-permutations of n set.
+- Iterator that return product
+- Function that call callback function to return product
+### Iterator
+This crate provides `KPermutation` struct that implement
+`Iterator` trait. The struct provide 3 use cases.
+- Use Rust builtin `Iterator` functionality.
+- Use `next` function that return borrowed result into mutable slice.
+- use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+### Callback function
+This crate provide 4 functions that serve different usecase.
+- `k_permutation` function that return product as callback parameter
+- `k_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
+- `k_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
+- `unsafe_k_permutation` unsafe function that return product into mutable pointer given in function parameter
+## Notes
+### Performance concern
+- Generally speaking, the standard callback function give highest throughput but the return result is a borrowed data with lifetime valid only in that callback scope.
+- The crate provides three built-in methods to share result.
+    1. callback function with "_cell" suffix.
+    2. An object method "next_into_cell"
+    3. Iterator that return an owned value.
+The callback with "_cell" suffix way is about 10%-20% slower than using "next_into_cell" method.
+The return owned value method is slowest but most versatile. It's about 1,000% slower than using
+"next_into_cell" method. However, it is still faster than using standard callback function then
+convert it to owned value to share result.
+- This crate provides two built-in methods to send result to other threads.
+    1. callback function with "_sync" suffix.
+    2. Iterator that return an owned value.
+The fastest and safest way to send result to other threads is to use an Iterator that return
+owned value. It's about 50%-200% faster than using callback function.
+### Mutating result is dangerous
+Most of sharing result use interior mutability so that the function/struct only borrow the
+sharing result. It'll mutably borrow only when it's going to mutate result and drop the mutable
+borrow immediately before calling a callback or return result from iteration. 
+This mean that the result is also mutable on user side. However, doing so may result in undesired
+behavior. For example: heap_permutation_cell function swap a pair of element inside Rc<RefCell<>>
+in place. If user swap value inside result, some permutation return in the future may duplicate with
+the already return one. If user remove some value inside result, it'll panic because inside
+the heap_permutation_cell function unrecognize the size change.
+### Send result to other thread is complicated
+This crate provides two built-in methods to send result across thread. The two usecase is strongly
+against each other in term of performance.
+The callback with "_sync" suffix store borrowed result into Arc<RwLock<>> which reduce the cost
+of allocating additional memory and copy/clone the result into it. Each thread that read borrowed
+content may need additional overhead of communication especially if it cannot miss any of the data
+send to it. In such case, the following scenario is applied
+1. The function generate new result
+2. The function send notification via channel to every threads that new result is available.
+3. The function block until every thread send notification back that they are all done with the data.
 
-All of it has `into_iter` function.
-`GosperCombination` implement `IntoIterator` trait.
-`HeapPermutation` and `KPermutation` implement `Iterator` trait. 
-It can be directly used inside for each loop.
-There's a special function `next` inside `HeapPermutation` and
-`KPermutation` that mimic `Iterator` by returning an `Option` 
-contain the permuted value or return `None` when all the permutations 
-are return. The special `next` function doesn't construct 
-new Vec on returned value but a reference to internal slice of 
-permuted value.
-## Trait that added functions to existing type
-It provides 2 traits that add function to existing type.
-- Combination trait, add combination function to `[T]` and `Vec<T>`
-- Permutation trait, add permutation function to `[T]` and `Vec<T>`
-
+Another way is to use Iterator that return an owned value then clone that value on each thread.
+This is much simpler to implement but require more memory. It'll simplify the scenario above to:
+1. The iterator return new result.
+2. It send notification with new data via channel to every threads.
+The performance observed in uncontrolled test environment show that the iterator way
+is faster than the callback by at least 50%.
+### Unsafe way is fastest and hardest
+It's because all "unsafe_" prefix function return result throught mutable pointer that
+make it has lowest cost to send result back. It leave everything else to user to do the work.
+To use it, make sure that the memory is return when it no longer use, synchronization, initialization
+is properly done. The original variable owner outlive both user and generator.
 # Example
 ## Get a permutation at specific point examples
 To get into 'n' specific lexicographic permutation, 
@@ -91,9 +179,44 @@ get_permutation_for(&nums, 5, 0); // return Err("Insufficient number of object i
 ## Cartesian product of multiple sets of data.
 To get cartesian product from 3 set of data.
 ```Rust
+    use permutator::cartesian_product;
+
     cartesian_product(&[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]], |product| {
         println!("{:?}", product);
     });
+```
+Or do it in iterative style
+```Rust
+    use permutator::CartesianProduct
+    use std::time::Instant;
+    let data : &[&[usize]] = &[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]];
+    let cart = CartesianProduct::new(&data);
+    let mut counter = 0;
+    let timer = Instant::now();
+
+    for p in cart {
+        // println!("{:?}", p);
+        counter += 1;
+    }
+
+    assert_eq!(data.iter().fold(1, |cum, domain| {cum * domain.len()}), counter);
+    println!("Total {} products done in {:?}", counter, timer.elapsed());
+```
+Or just mimic an iterator but taking only a reference.
+```Rust
+    use std::time::Instant;
+    let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9]];
+    let mut cart = CartesianProduct::new(&data);
+    let mut counter = 0;
+    let timer = Instant::now();
+
+    while let Some(p) = cart.next() {
+        // println!("{:?}", p);
+        counter += 1;
+    }
+
+    assert_eq!(data.iter().fold(1, |cum, domain| {cum * domain.len()}), counter);
+    println!("Total {} products done in {:?}", counter, timer.elapsed());
 ```
 ## Combination Iterator examples
 The struct offer two ways to get a combination. 
@@ -210,4 +333,256 @@ data.permutation().for_each(|p| {
 // The `data` at this point will also got permuted.
 // It'll print the last permuted value twice.
 println!("{:?}", data);
+```
+## Unsafe way for faster share result
+In some circumstance, the combination result need to be shared but
+the safe function don't allow you to share the result except copy/clone
+the result for each share. When that's the case, using Iterator may answer
+such situation. As long as the Iterator itself live longer than the shared 
+result, it's safe to borrow that result to wherever it need. This has lower
+cost than using callback function then clone/copy it for each share.
+But If safety is less concern than performance, there's an unsafe side 
+implementation that take a mutable pointer to store result.
+```Rust
+    use permutator::unsafe_combination;
+    let data = [1, 2, 3, 4, 5];
+    let r = 3;
+    let mut counter = 0;
+    let mut result = vec![&data[0]; r];
+    let result_ptr = result.as_mut_slice() as *mut [&usize];
+
+    unsafe {
+        unsafe_combination(&data, r, result_ptr, || {
+            println!("{:?}", result);
+            counter += 1;
+        });
+    }
+
+    assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
+```
+## Iterator that produce data for sharing
+An example showing the built-in feature that save new k-permutation into
+Rc<RefCell<>> so it can be easily share to other.
+This example use two worker objects that read each k-permutation
+and print it.
+```Rust
+    use std::fmt::Debug;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use permutator::KPermutation;
+
+    trait Consumer {
+        fn consume(&self);
+    }
+
+    struct Worker1<'a, T : 'a> {
+        data : Rc<RefCell<&'a mut[&'a T]>>
+    }
+    impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+        fn consume(&self) {
+            println!("Work1 has {:?}", self.data.borrow());
+        }
+    }
+
+    struct Worker2<'a, T : 'a> {
+        data : Rc<RefCell<&'a mut[&'a T]>>
+    }
+    impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+        fn consume(&self) {
+            println!("Work2 has {:?}", self.data.borrow());
+        }
+    }
+
+    let k = 3;
+    let data = &[1, 2, 3, 4, 5];
+    let mut result = vec![&data[0]; k];
+    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+
+    let worker1 = Worker1 {
+        data : Rc::clone(&shared)
+    };
+    let worker2 = Worker2 {
+        data : Rc::clone(&shared)
+    };
+
+    let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+    
+    let mut kperm = KPermutation::new(data, k);
+    while let Some(_) = kperm.next_into_cell(&shared) {
+        consumers.iter().for_each(|c| {c.consume();});
+    }
+```
+## Share with multiple object from callback function
+An example showing the built-in feature that save new cartesian product into
+Rc<RefCell<>> so it can be easily share to other.
+This example use two worker objects that read each cartesian product
+and print it.
+```Rust
+    use std::fmt::Debug;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    use permutator::cartesian_product_cell;
+
+    trait Consumer {
+        fn consume(&self);
+    }
+    struct Worker1<'a, T : 'a> {
+        data : Rc<RefCell<&'a mut[&'a T]>>
+    }
+    impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+        fn consume(&self) {
+            println!("Work1 has {:?}", self.data);
+        }
+    }
+    struct Worker2<'a, T : 'a> {
+        data : Rc<RefCell<&'a mut[&'a T]>>
+    }
+    impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+        fn consume(&self) {
+            println!("Work2 has {:?}", self.data);
+        }
+    }
+
+    fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [&'a i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+        cartesian_product_cell(data, cur_result, || {
+            consumers.iter().for_each(|c| {
+                c.consume();
+            })
+        });
+    }
+
+    let data : &[&[i32]] = &[&[1, 2], &[3, 4, 5], &[6]];
+    let mut result = vec![&data[0][0]; data.len()];
+
+    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+    let worker1 = Worker1 {
+        data : Rc::clone(&shared)
+    };
+    let worker2 = Worker2 {
+        data : Rc::clone(&shared)
+    };
+    let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+    start_cartesian_product_process(data, shared, consumers);
+```
+## Iterator that send data to other threads
+This example generates a k-permutation and send it to multiple threads
+by using KPermutation iterator.
+
+The main thread will keep generating a new k-permutation and send it to
+every thread while all other threads read new k-permutation via channel.
+In this example, it use sync_channel with size 0. It doesn't hold anything
+inside the buffer. The sender will block until the receiver read the data.
+```Rust
+    use permutator::KPermutation;
+    use std::sync::mpsc;
+    let k = 5;
+    let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    // workter thread 1
+    let (t1_send, t1_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
+
+    thread::spawn(move || {
+        while let Some(c) = t1_recv.recv().unwrap() {
+            let result : Vec<&i32> = c;
+            println!("Thread1: {:?}", result);
+        }
+        println!("Thread1 is done");
+    });
+
+    // worker thread 2
+    let (t2_send, t2_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
+    thread::spawn(move || {
+        while let Some(c) = t2_recv.recv().unwrap() {
+            let result : Vec<&i32> = c;
+            println!("Thread2: {:?}", result);
+        }
+        println!("Thread2 is done");
+    });
+
+    let channels = vec![t1_send, t2_send];
+    // main thread that generate result
+    thread::spawn(move || {
+        use std::time::Instant;
+        let timer = Instant::now();
+        let mut counter = 0;
+        let kperm = KPermutation::new(data, k);
+        
+        kperm.into_iter().for_each(|c| {
+            channels.iter().for_each(|t| {t.send(Some(c.to_owned())).unwrap();});
+            counter += 1;
+        });
+        channels.iter().for_each(|t| {t.send(None).unwrap()});
+        println!("Done {} combinations in {:?}", counter, timer.elapsed());
+    }).join().unwrap();
+```
+## Callback function send data to other thread
+This example generates a k-permutation and send it to multiple threads by
+using a callback approach k_permutation_sync function.
+
+The main thread will keep generating a new k-permutation and send it to
+every thread while all other threads read new k-permutation via channel.
+In this example, it use sync_channel with size 0. It doesn't hold anything
+inside the buffer. The sender will block until the receiver read the data.
+```Rust
+    use std::sync::{Arc, RwLock};
+    use std::sync::mpsc;
+    use std::sync::mpsc::{Receiver, SyncSender};
+    fn start_k_permutation_process<'a>(data : &'a[i32], cur_result : Arc<RwLock<Vec<&'a i32>>>, k : usize, notifier : Vec<SyncSender<Option<()>>>, release_recv : Receiver<()>) {
+        use std::time::Instant;
+        let timer = Instant::now();
+        let mut counter = 0;
+        k_permutation_sync(data, k, cur_result, || {
+            notifier.iter().for_each(|n| {
+                n.send(Some(())).unwrap(); // notify every thread that new data available
+            });
+
+            for _ in 0..notifier.len() {
+                release_recv.recv().unwrap(); // block until all thread reading data notify on read completion
+            }
+
+            counter += 1;
+        });
+
+        notifier.iter().for_each(|n| {n.send(None).unwrap()}); // notify every thread that there'll be no more data.
+
+        println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
+    }
+    let k = 5;
+    let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let result = vec![&data[0]; k];
+    let result_sync = Arc::new(RwLock::new(result));
+
+    // workter thread 1
+    let (t1_send, t1_recv) = mpsc::sync_channel::<Option<()>>(0);
+    let (main_send, main_recv) = mpsc::sync_channel(0);
+    let t1_local = main_send.clone();
+    let t1_dat = Arc::clone(&result_sync);
+    thread::spawn(move || {
+        while let Some(_) = t1_recv.recv().unwrap() {
+            let result : &Vec<&i32> = &*t1_dat.read().unwrap();
+            // println!("Thread1: {:?}", result);
+            t1_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
+        }
+        println!("Thread1 is done");
+    });
+
+    // worker thread 2
+    let (t2_send, t2_recv) = mpsc::sync_channel::<Option<()>>(0);
+    let t2_dat = Arc::clone(&result_sync);
+    let t2_local = main_send.clone();
+    thread::spawn(move || {
+        while let Some(_) = t2_recv.recv().unwrap() {
+            let result : &Vec<&i32> = &*t2_dat.read().unwrap();
+            // println!("Thread2: {:?}", result);
+            t2_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
+        }
+        println!("Thread2 is done");
+    });
+
+    // main thread that generate result
+    thread::spawn(move || {
+        start_k_permutation_process(data, result_sync, k, vec![t1_send, t2_send], main_recv);
+    }).join().unwrap();
 ```
