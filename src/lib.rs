@@ -1552,8 +1552,9 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
     /// New cartesian product between each `domains` inside `result` parameter 
     /// and also return `Some(())` if result is updated or `None` when there's
     /// no new result.
-    pub fn next_into_cell(&'a mut self, result: &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
+    pub fn next_into_cell(&mut self, result: &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
         let mut exhausted = false;
+        let mut result = result.borrow_mut();
         
         // move and set `result` and `c` up until all `domains` processed
         while self.i < self.domains.len() && !exhausted {
@@ -1565,7 +1566,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
                 // reset all exhausted until either found non-exhausted or reach first domain
                 while self.c[k] == self.domains[k].len() && k > 0 {
                     self.c[k] = 1;
-                    self.result[k] = &self.domains[k][0];
+                    result[k] = &self.domains[k][0];
                     k -= 1;
                 }
 
@@ -1574,12 +1575,12 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
                     exhausted = true;
                 } else {
                     // otherwise advance c[k] and set result[k] to next value
-                    self.result[k] = &self.domains[k][self.c[k]];
+                    result[k] = &self.domains[k][self.c[k]];
                     self.c[k] += 1;
                 }
             } else {
                 // non exhausted domain, advance `c` and set result
-                self.result[self.i] = &self.domains[self.i][self.c[self.i]];
+                result[self.i] = &self.domains[self.i][self.c[self.i]];
                 self.c[self.i] += 1;
             }
             self.i += 1;
@@ -1589,7 +1590,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
             None
         } else {
             self.i -= 1; // rewind `i` back to last domain
-            result.replace(self.result.as_mut_slice());
+            
             Some(())
         }
     }
@@ -3561,7 +3562,7 @@ pub mod test {
     }
 
     #[test]
-    fn test_cartesian_product_shared_result() {
+    fn test_cartesian_product_shared_result_fn() {
         use std::fmt::Debug;
 
         trait Consumer {
@@ -3607,6 +3608,54 @@ pub mod test {
     
     }
 
+    #[allow(non_snake_case)]
+    #[test]
+    fn test_CartesianProduct_iterator_alike_shared_result() {
+        use std::fmt::Debug;
+
+        trait Consumer {
+            fn consume(&self);
+        }
+        struct Worker1<'a, T : 'a> {
+            data : Rc<RefCell<&'a mut[&'a T]>>
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+            fn consume(&self) {
+                println!("Work1 has {:?}", self.data);
+            }
+        }
+        struct Worker2<'a, T : 'a> {
+            data : Rc<RefCell<&'a mut[&'a T]>>
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+            fn consume(&self) {
+                println!("Work2 has {:?}", self.data);
+            }
+        }
+
+        fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [&'a i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+            let mut cart = CartesianProduct::new(data);
+            while let Some(_) = cart.next_into_cell(&cur_result) {
+                consumers.iter().for_each(|c| {
+                    c.consume();
+                })
+            };
+        }
+
+        let data : &[&[i32]] = &[&[1, 2], &[3, 4, 5], &[6]];
+        let mut result = vec![&data[0][0]; data.len()];
+
+        let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+        let worker1 = Worker1 {
+            data : Rc::clone(&shared)
+        };
+        let worker2 = Worker2 {
+            data : Rc::clone(&shared)
+        };
+        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        start_cartesian_product_process(data, shared, consumers);
+    
+    }
     #[test]
     fn test_shared_cartesian_product_result_sync_fn() {
         fn start_cartesian_product_process<'a>(data : &'a[&[i32]], cur_result : Arc<RwLock<Vec<&'a i32>>>, notifier : Vec<SyncSender<Option<()>>>, release_recv : Receiver<()>) {
