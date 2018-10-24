@@ -1552,7 +1552,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
     /// New cartesian product between each `domains` inside `result` parameter 
     /// and also return `Some(())` if result is updated or `None` when there's
     /// no new result.
-    pub fn next_into_cell(&'a mut self, result: Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
+    pub fn next_into_cell(&'a mut self, result: &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
         let mut exhausted = false;
         
         // move and set `result` and `c` up until all `domains` processed
