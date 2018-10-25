@@ -5,7 +5,7 @@ documentation = "https://docs.rs/permutator/0.1.6/"
 keywords = ["cartesian", "permutation", "combination", "multiple", "k-permutation"]
 license = "BSD-3-Clause"
 repository = "https://github.com/NattapongSiri/permutator"
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
 
 [lib]

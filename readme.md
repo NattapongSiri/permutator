@@ -19,6 +19,66 @@ data.combination(3).for_each(|mut c| { // need mut
     println!("{:?}", c);
 });
 ```
+## Breaking change from 0.1.6 to 0.2.0
+- An iterator style `next_into_cell` has been refactored into `IteratorCell` trait.
+- The mimic `next` function that mimic `Iterator` trait implemented for `CartesianProduct` and `KPermutation` struct now borrow a mutable slice to store result instead. It's now consistent to all other Iterator style struct.
+- `Permutation` trait now use associated type `permutator` to define the struct that will be used to perform permutation on slice/array/Vec and Rc<RefCell<&mut [T]>> instead of fix return on `HeapPermutation` struct but the type need to implement `Iterator` trait. It doesn't constrait the associated type `Item` defined in `Iterator` thought. The trait now take <'a> lifetime parameter and no longer take generic type `T`. The `permutation` function change signature from `permutation(&mut self)` to `permutation(&'a mut self)`.
+## Migration guide from 0.1.6 to 0.2.0
+- add `use permutator::IteratorCell;` when you use `next_into_cell` function from any struct in this crate.
+- All `next` function that mimic `Iterator` in every struct now borrow a mutable slice to store result except `HeapPermutation` struct that is left untouch. 
+- Any implementation on other type for `Permutation` trait need to define the associated type and change `permutation` function signature.
+
+Example:
+New `next` function signature
+```Rust
+    // instead of this
+    // while let Some(prod) = cartesian_product_object.next() {
+    // }
+    // use this
+    let result = vec![&data[0][0], data.len()];
+    while let Some(_) = cartesian_product_object.next(result.as_mutable_slice()) {
+    }
+```
+New `Permutation` trait now look like this.
+```Rust
+// instead of this old implementation
+// impl Permutation<T> for [T] {
+//     fn permutation(&mut self) -> HeapPermutation<T> {
+//          HeapPermutation {
+//              c : vec![0; self.len],
+//              data : self,
+//              i : 0
+//          }
+//     }
+// }
+// now it become..
+impl<'a, T> Permutation<'a> for [T] where T : 'a {
+    type Permutator = HeapPermutation<'a, T>; // This struct implement `Iterator`
+
+    fn permutation(&'a mut self) -> HeapPermutation<T> {
+        HeapPermutation {
+            c : vec![0; self.len()],
+            data : self,
+            i : 0
+        }
+    }
+}
+```
+The added complexity let this trait add applicable to wider type.
+Here's new implemention on `Rc<RefCell<&mut [T]>>` which return `HeapPermutationCell`.
+```Rust
+impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a {
+    type Permutator = HeapPermutationCell<'a, T>; // This struct also implement `Iterator`
+
+    fn permutation(&'a mut self) -> HeapPermutationCell<T> {
+        HeapPermutationCell {
+            c : vec![0; self.borrow().len()],
+            data : Rc::clone(self),
+            i : 0
+        }
+    }
+}
+```
 ## Get a permutation at specific point, not an iterator style.
 It provides 2 functions to generate a combination.
 - get_cartesian_for
@@ -32,10 +92,11 @@ There are two distinct implementation to get cartesian product.
 - Function that call callback function to return product
 ### Iterator 
 This crate provides `CartesianProduct` struct that implement
-`Iterator` trait. The struct provide 3 use cases.
+`Iterator`, `IteratorCell`, `IteratorReset` trait. The struct provide 3 use cases.
 - Use Rust builtin `Iterator` functionality.
 - Use `next` function that return borrowed result into mutable slice.
 - use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+- use `reset` function instead of creating a new Iterator everytime you need to reiterate.
 ### Callback function
 This crate provides 4 functions that serve different usecase.
 - `cartesian_product` function that return product as callback parameter
@@ -49,10 +110,11 @@ There are three distinct implementation to get k-combinations of n set.
 - Function that call callback function to return product
 ### Iterator
 This crate provides `GosperCombination` struct that implement
-`IntoIterator` trait. The struct provide 3 use cases.
+`IntoIterator`, `IteratorCell`, `IteratorReset` trait. The struct provide 3 use cases.
 - Use Rust builtin `Iterator` functionality.
 - Use `next` function that return borrowed result into mutable slice.
 - use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+- use `reset` function instead of creating a new Iterator everytime you need to reiterate.
 ### Trait
 This crate provides `Combination` trait and basic implementation on generic slice and generic Vec.
 It add `combination(usize)` function on the slice and Vec.
@@ -68,13 +130,17 @@ There are three distinct implementation to get permutation.
 - Trait that add function to slice and Vec
 - Function that call callback function to return a permutation
 ### Iterator
-This crate provides `HeapPermutation` struct that implement
-`Iterator` trait. The struct provide 2 use cases.
-- Use Rust builtin `Iterator` functionality.
-- Use `next` function that return borrowed result into mutable slice.
+This crate provides `HeapPermutation` and `HeapPermutationCell` struct that implement
+`Iterator`, `IteratorReset` trait. The struct provide 3 use cases.
+- Use Rust builtin `Iterator` functionality from `HeapPermutation` or
+Clone Rc<RefCell<&mut [T]>> then construct `HeapPermutationCell` and 
+on each iteration of `HeapPermutationCell`, the cloned one will have
+the permutated value inside it.
+- Use `next` function from `HeapPermutation` that return borrowed result in an Option instead of an owned value like typical Iterator.
+- use `reset` function instead of creating a new Iterator everytime you need to completely re-permutation again.
 ### Trait
-This crate provides `Permutation` trait and basic implementation on generic slice and generic Vec.
-It add `permutation` function on the slice and Vec.
+This crate provides `Permutation` trait and basic implementation on generic slice/array and generic Vec as well as Rc<RefCell<&mut [T]>>. It add `permutation` function on the slice/array, Vec, and
+Rc<RefCell<&mut [T]>>. There's some usage different on how to iterate over permutation of slice/array/Vec than Rc<RefCell<&mut [T]>>. See an example of permutation of [slice/array/Vec](#traits-that-add-new-function-to-t-or-vect) and [Rc<RefCell<&mut [T]>>]
 ### Callback function
 This crate provide 3 functions that serve different usecase.
 - `heap_permutation` function that return product as callback parameter
@@ -86,10 +152,11 @@ There are two distinct implementation to get k-permutations of n set.
 - Function that call callback function to return product
 ### Iterator
 This crate provides `KPermutation` struct that implement
-`Iterator` trait. The struct provide 3 use cases.
+`Iterator`, `IteratorCell`, `IteratorReset` trait. The struct provide 3 use cases.
 - Use Rust builtin `Iterator` functionality.
 - Use `next` function that return borrowed result into mutable slice.
 - use `next_into_cell` function that return borrowed result into Rc<RefCell<>> of mutable slice.
+- use `reset` function instead of creating a new Iterator everytime you need to reiterate.
 ### Callback function
 This crate provide 4 functions that serve different usecase.
 - `k_permutation` function that return product as callback parameter
@@ -97,6 +164,21 @@ This crate provide 4 functions that serve different usecase.
 - `k_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
 - `unsafe_k_permutation` unsafe function that return product into mutable pointer given in function parameter
 ## Notes
+### HeapPermutation struct has inconsistent `next` function design than other
+HeapPermutation struct provide two `next` functions.
+One is conform to `Iterator` trait. Another is just a mimic to `Iterator` but return
+a reference instead of an owned value. However, the way it return value is different 
+comparing to all other struct in this crate. This is because the permutation is done
+in place. This struct borrow mutable slice of data. If it take another `result` of
+borrowed mutable slice again then it'll leave the borrowed data given on constructor
+untouch and keep mutating the function parameter `result` instead. And since this 
+struct borrow a mutable slice already, the same mutable slice cannot be mutable borrow
+again in each next call. Thus, require user to duplicate data, one into constructor which
+will be leave untouch, another into each next call.
+
+To make it simpler and cleaner, the `next` function that mimic `Iterator` will not
+borrow mutable slice like all other struct in this crate but return a result through
+Option that return from function. 
 ### Performance concern
 - Generally speaking, the standard callback function give highest throughput but the return result is a borrowed data with lifetime valid only in that callback scope.
 - The crate provides three built-in methods to share result.
@@ -304,12 +386,46 @@ while let Some(permutated) = permutator.next() {
 
 println!("Done {} permutations in {:?}", counter, timer.elapsed());
 ```
+## Iterator alike sharable permutation example
+There's `HeapPermutationCell` and `KPermutation` struct that can do 
+permutation like this. Below is an example of `HeapPermutationCell`.
+```Rust
+use permutator::HeapPermutationCell;
+use std::time::{Instant};
+let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point {}", num)}).collect();
+let shared = Rc::new(RefCell::new(data.as_mut_slice()));
+let permutator = HeapPermutationCell::new(Rc::clone(&shared));
+println!("{}:{:?}", 0, &*shared.borrow()); 
+let timer = Instant::now();
+let mut counter = 1;
+
+for _ in permutator {
+    println!("{}:{:?}", counter, &*shared.borrow());
+    counter += 1;
+}
+
+println!("Done {} permutations in {:?}", counter, timer.elapsed());
+assert_eq!(6, counter);
+```
+The `KPermutation` example show below
+```Rust
+let k = 3;
+let data = &[1, 2, 3, 4, 5];
+let mut result = vec![&data[0]; k];
+let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+
+let mut kperm = KPermutation::new(data, k);
+while let Some(_) = kperm.next_into_cell(&shared) {
+    // each permutation will be stored in `shared`
+    println!("{:?}", &*shared.borrow());
+}
+```
 ## Traits that add new function to `[T]` or `Vec<T>`
 `Combination` trait add `combination` function.
 The function take 1 parameter. It's a size of combination frame.
 The function return the same Iterator that also return by 
 the [provided struct](#iterator-style-permutationscombinations)
-so it can be used like [this example](#combination-iterator-examples)
+so it can be used like [this example](#iterator-alike-sharable-permutation-example)
 ```Rust
 use permutator::Combination;
 let data = [1, 2, 3, 4, 5];
@@ -333,6 +449,21 @@ data.permutation().for_each(|p| {
 // The `data` at this point will also got permuted.
 // It'll print the last permuted value twice.
 println!("{:?}", data);
+```
+## Traits that add new function to `Rc<RefCell<&mut [T]>>`
+`Permutation` trait add `permutation` function to Rc<RefCell<&mut [T]>>.
+It permute the `[T]` in place. 
+The function return the same Iterator an object of `HeapPermutationCell`
+so it can be used like [this example](#iterator-alike-sharable-permutation-example)
+```Rust
+use permutator::Permutation;
+let mut data : &mut [i32] = &mut [1, 2, 3];
+let mut shared = Rc::new(RefCell::new(data));
+let value = Rc::clone(&shared);
+shared.permutation().for_each(|_| {
+    // print all the permutation.
+    println!("{:?}", &*value.borrow());
+});
 ```
 ## Unsafe way for faster share result
 In some circumstance, the combination result need to be shared but
@@ -361,6 +492,13 @@ implementation that take a mutable pointer to store result.
     assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
 ```
 ## Iterator that produce data for sharing
+This crate provide `IteratorCell` trait. 
+The trait enforce that the return value need to be put into borrowed Rc<RefCell<>>.
+There are 3 struct that implemented this trait.
+- CartesianProduct
+- KPermutation
+- GosperCombination
+
 An example showing the built-in feature that save new k-permutation into
 Rc<RefCell<>> so it can be easily share to other.
 This example use two worker objects that read each k-permutation
@@ -370,7 +508,7 @@ and print it.
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    use permutator::KPermutation;
+    use permutator::{KPermutation, IteratorCell};
 
     trait Consumer {
         fn consume(&self);

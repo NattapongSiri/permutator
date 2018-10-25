@@ -11,14 +11,17 @@
 //! - Iterator style
 //! - Callback function style
 //! 
-//! # Easy share result
+//! # Easily share result
 //! - Every function can take Rc<RefCell<>> to store result.
 //! - An iterator that return owned value.
 //! - Every callback style function can take Arc<RwLock<>> to store result.
 //! 
 //! # Easy usage
 //! Two built-in traits that add combination and permutation functionality
-//! to both Vec and slice.
+//! to both Vec and slice/array. The `Permutation` trait also implemented
+//! on type Rc<RefCell<&mut [T]>>. It is still do permuted in place so
+//! any object that own or borrow this Rc<RefCell<&mut [T]>> will also
+//! got updated as well.
 //! 
 //! # Unreach raw performance with unsafe
 //! Every callback style function can take raw mutable pointer to store result.
@@ -1419,6 +1422,33 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
     }
 }
 
+/// An iterator that return value into borrowed Rc<RefCell<Self::Item>> instead of inside return Option.
+/// The return type is defined in [IteratorCell associated type](trait.IteratorCell.html#associatedtype.Item)
+pub trait IteratorCell {
+    /// An Item return from [next_into_cell function](trait.IteratorCell.html#fn.next_into_cell)
+    /// inside a borrowed Rc<RefCell<>>
+    type Item;
+    
+    /// Mimic iterator `next` function but return value into Rc<RefCell<>> that
+    /// contains mutable slice. It also return an empty Option to tell caller
+    /// to distinguish if it's put new value or the iterator itself is exhausted.
+    /// # Paramerter
+    /// - `result` An Rc<RefCell<>> contains [IteratorCell associated type](trait.IteratorCell.html#associatedtype.Item)
+    /// # Return
+    /// [IteratorCell associated type](trait.IteratorCell.html#associatedtype.Item) 
+    /// insides `result` parameter and also return `Some(())` if new result is updated
+    /// or `None` when there's no new result.
+    fn next_into_cell(&mut self, result: &Rc<RefCell<Self::Item>>) -> Option<()>;
+}
+
+/// A trait that add reset function to an existing Iterator.
+/// It mean that the `next` or `next_into_cell` call will start returning
+/// the first element again
+pub trait IteratorReset {
+    /// Reset an iterator. It make an iterator start from the beginning again.
+    fn reset(&mut self);
+}
+
 /// Generate a cartesian product between given domains in an iterator style.
 /// The struct implement `Iterator` trait so it can be used in `Iterator` 
 /// style. The struct provide [into_iter()](#method.into_iter()) function 
@@ -1450,12 +1480,34 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
 ///    use permutator::CartesianProduct;
 ///    use std::time::Instant;
 ///    let data : &[&[usize]] = &[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]];
+///    let mut result : Vec<&usize> = vec![&data[0][0]; data.len()];
 ///    let mut cart = CartesianProduct::new(&data);
 ///    let mut counter = 0;
 ///    let timer = Instant::now();
 ///
-///    while let Some(p) = cart.next() {
-///        // println!("{:?}", p);
+///    while let Some(p) = cart.next(result.as_mut_slice()) {
+///        println!("{:?}", p);
+///        counter += 1;
+///    }
+///
+///    assert_eq!(data.iter().fold(1, |cum, domain| {cum * domain.len()}), counter);
+///    println!("Total {} products done in {:?}", counter, timer.elapsed());
+/// ```
+/// - Iterator style storing value inside Rc<RefCell<>>
+/// ```
+///    use permutator::{CartesianProduct, IteratorCell};
+///    use std::cell::RefCell;
+///    use std::rc::Rc;
+///    use std::time::Instant;
+///    let data : &[&[usize]] = &[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]];
+///    let mut result = vec![&data[0][0]; data.len()];
+///    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+///    let mut cart = CartesianProduct::new(data);
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///
+///    while let Some(_) = cart.next_into_cell(&shared) {
+///        println!("{:?}", &*shared.borrow());
 ///        counter += 1;
 ///    }
 ///
@@ -1465,6 +1517,7 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
 pub struct CartesianProduct<'a, T> where T : 'a {
     c : Vec<usize>,
     domains : &'a [&'a [T]],
+    exhausted : bool,
     i : usize,
 
     result : Vec<&'a T>
@@ -1483,6 +1536,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
         CartesianProduct {
             c : vec![0; domains.len()],
             domains : domains,
+            exhausted : false,
             i : 0,
 
             result : vec![&domains[0][0]; domains.len()]
@@ -1498,10 +1552,52 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
 
     /// Mimic iterator `next` function but return a reference instead of
     /// clone/copy the value into the result.
-    pub fn next(&mut self) -> Option<(&[&T])> {
-        let mut exhausted = false;
+    pub fn next(&mut self, result : &mut [&'a T]) -> Option<()> {
         // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !exhausted {
+        while self.i < self.domains.len() && !self.exhausted {
+            // if current domain is exhausted.
+            if self.c[self.i] == self.domains[self.i].len() {
+                // reset all exhausted domain in `result` and `c`
+                let mut k = self.i;
+
+                // reset all exhausted until either found non-exhausted or reach first domain
+                while self.c[k] == self.domains[k].len() && k > 0 {
+                    self.c[k] = 1;
+                    result[k] = &self.domains[k][0];
+                    k -= 1;
+                }
+
+                if k == 0 && self.c[k] == self.domains[k].len() {
+                    // if first domain is also exhausted then flag it.
+                    self.exhausted = true;
+                } else {
+                    // otherwise advance c[k] and set result[k] to next value
+                    result[k] = &self.domains[k][self.c[k]];
+                    self.c[k] += 1;
+                }
+            } else {
+                // non exhausted domain, advance `c` and set result
+                result[self.i] = &self.domains[self.i][self.c[self.i]];
+                self.c[self.i] += 1;
+            }
+            self.i += 1;
+        }
+
+        if self.exhausted {
+            None
+        } else {
+            self.i -= 1; // rewind `i` back to last domain
+            Some(())
+        }
+    }
+}
+
+impl<'a, T> Iterator for CartesianProduct<'a, T> {
+    type Item = Vec<&'a T>;
+
+    fn next(&mut self) -> Option<Vec<&'a T>> {
+        // move and set `result` and `c` up until all `domains` processed
+        while self.i < self.domains.len() && !self.exhausted {
             // if current domain is exhausted.
             if self.c[self.i] == self.domains[self.i].len() {
                 // reset all exhausted domain in `result` and `c`
@@ -1516,7 +1612,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
 
                 if k == 0 && self.c[k] == self.domains[k].len() {
                     // if first domain is also exhausted then flag it.
-                    exhausted = true;
+                    self.exhausted = true;
                 } else {
                     // otherwise advance c[k] and set result[k] to next value
                     self.result[k] = &self.domains[k][self.c[k]];
@@ -1530,13 +1626,17 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
             self.i += 1;
         }
 
-        if exhausted {
+        if self.exhausted {
             None
         } else {
             self.i -= 1; // rewind `i` back to last domain
-            Some(&self.result)
+            Some(self.result.to_owned())
         }
     }
+}
+
+impl<'a, T> IteratorCell for CartesianProduct<'a, T> where T : 'a {
+    type Item = &'a mut [&'a T];
 
     /// Mimic iterator `next` function but return value into Rc<RefCell<>> that
     /// contains mutable slice. It also return an empty Option to tell caller
@@ -1552,12 +1652,11 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
     /// New cartesian product between each `domains` inside `result` parameter 
     /// and also return `Some(())` if result is updated or `None` when there's
     /// no new result.
-    pub fn next_into_cell(&mut self, result: &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
-        let mut exhausted = false;
+    fn next_into_cell(&mut self, result: &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
         let mut result = result.borrow_mut();
         
         // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !exhausted {
+        while self.i < self.domains.len() && !self.exhausted {
             // if current domain is exhausted.
             if self.c[self.i] == self.domains[self.i].len() {
                 // reset all exhausted domain in `result` and `c`
@@ -1572,7 +1671,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
 
                 if k == 0 && self.c[k] == self.domains[k].len() {
                     // if first domain is also exhausted then flag it.
-                    exhausted = true;
+                    self.exhausted = true;
                 } else {
                     // otherwise advance c[k] and set result[k] to next value
                     result[k] = &self.domains[k][self.c[k]];
@@ -1586,7 +1685,7 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
             self.i += 1;
         }
 
-        if exhausted {
+        if self.exhausted {
             None
         } else {
             self.i -= 1; // rewind `i` back to last domain
@@ -1596,47 +1695,11 @@ impl<'a, T> CartesianProduct<'a, T> where T : 'a {
     }
 }
 
-impl<'a, T> Iterator for CartesianProduct<'a, T> {
-    type Item = Vec<&'a T>;
-
-    fn next(&mut self) -> Option<Vec<&'a T>> {
-        let mut exhausted = false;
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.domains[self.i].len() {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
-
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.domains[k].len() && k > 0 {
-                    self.c[k] = 1;
-                    self.result[k] = &self.domains[k][0];
-                    k -= 1;
-                }
-
-                if k == 0 && self.c[k] == self.domains[k].len() {
-                    // if first domain is also exhausted then flag it.
-                    exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    self.result[k] = &self.domains[k][self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                self.result[self.i] = &self.domains[self.i][self.c[self.i]];
-                self.c[self.i] += 1;
-            }
-            self.i += 1;
-        }
-
-        if exhausted {
-            None
-        } else {
-            self.i -= 1; // rewind `i` back to last domain
-            Some(self.result.to_owned())
-        }
+impl<'a, T> IteratorReset for CartesianProduct<'a, T> {
+    fn reset(&mut self) {
+        self.c = vec![0; self.domains.len()];
+        self.exhausted = false;
+        self.i = 0;
     }
 }
 
@@ -1751,14 +1814,6 @@ impl<'a, T> HeapPermutation<'a, T> {
 
         None
     }
-
-    /// Reset this permutator so calling next will continue
-    /// permutation on current permuted data.
-    /// It will not reset permuted data.
-    pub fn reset(&mut self) {
-        self.i = 0;
-        self.c.iter_mut().for_each(|c| {*c = 0;});
-    }
 }
 
 impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
@@ -1788,6 +1843,120 @@ impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
     }
 }
 
+impl<'a, T> IteratorReset for HeapPermutation<'a, T> {
+    /// Reset this permutator so calling next will continue
+    /// permutation on current permuted data.
+    /// It will not reset permuted data.
+    fn reset(&mut self) {
+        self.i = 0;
+        self.c.iter_mut().for_each(|c| {*c = 0;});
+    }
+}
+
+/// Heap's permutation in Rc<RefCell<>> mimic Iterator style.
+/// It provides another choice for user that want to share 
+/// permutation result but doesn't want to clone it for 
+/// each share. It also doesn't create new result on each
+/// iteration unlike other object that implement `Iterator` trait.
+/// # Rationale
+/// Unlike all other struct, HeapPermutation permute value in place.
+/// If HeapPermutation struct implement IteratorCell itself will
+/// result in the `data` inside struct left unused.
+/// This struct introduce the same concept to other struct that 
+/// implement `IteratorCell`, to be able to easily share
+/// result with as less performance overhead as possible.
+/// 
+/// The implementation take Rc<RefCell<&mut [T]>> instead of regular
+/// slice like other permutation struct.
+/// It implements `Iterator` trait with empty associated type because
+/// it doesn't return value. It permutes the data in place thus
+/// every owner of Rc<RefCell<&mut [T]>> will always has an up-to-date
+/// slice.
+/// # Examples
+/// Iterator style usage example:
+/// ```
+///    use permutator::HeapPermutationCell;
+///    use std::cell::RefCell;
+///    use std::rc::Rc;
+///    use std::time::{Instant};
+///    let data : &mut [i32] = &mut [1, 2, 3, 4, 5];
+///    let shared = Rc::new(RefCell::new(data));
+///    let mut permutator = HeapPermutationCell::new(Rc::clone(&shared));
+///    println!("0:{:?}", &*shared.borrow());
+///    let timer = Instant::now();
+///    let mut counter = 1;
+///
+///    for _ in permutator { // it return empty
+///        println!("{}:{:?}", counter, &*shared.borrow());
+///        counter += 1;
+///    }
+/// 
+///    // or use iterator related functional approach like line below.
+///    // permutator.into_iter().for_each(|_| {
+///    //     println!("{}:{:?}", counter, &*data.borrow());
+///    //     counter += 1;
+///    // });
+///
+///    println!("Done {} permutations in {:?}", counter, timer.elapsed());
+/// ```
+/// # See
+/// - [HeapPermutation struct](struct.HeapPermutation.html)
+pub struct HeapPermutationCell<'a, T> where T : 'a {
+    c : Vec<usize>,
+    data : Rc<RefCell<&'a mut[T]>>,
+    i : usize
+}
+
+impl<'a, T> HeapPermutationCell<'a, T> {
+    /// Construct a new permutation iterator.
+    /// Note: the provided parameter will get mutated
+    /// in placed at first call to next.
+    pub fn new(data : Rc<RefCell<&'a mut[T]>>) -> HeapPermutationCell<'a, T> {
+        HeapPermutationCell {
+            c : vec![0; data.borrow().len()],
+            data : Rc::clone(&data),
+            i : 0
+        }
+    }
+}
+
+impl<'a, T> Iterator for HeapPermutationCell<'a, T> where T : 'a {
+    type Item= ();
+
+    fn next(&mut self) -> Option<()> {
+        let i = &mut self.i;
+
+        while *i < self.data.borrow().len() {
+            if self.c[*i] < *i {
+                if *i % 2 == 0 {
+                    self.data.borrow_mut().swap(0, *i);
+                } else {
+                    self.data.borrow_mut().swap(self.c[*i], *i);
+                }
+
+                self.c[*i] += 1;
+                *i = 0;
+                return Some(())
+            } else {
+                self.c[*i] = 0;
+                *i += 1;
+            }
+        }
+
+        None
+    }
+}
+
+impl<'a, T> IteratorReset for HeapPermutationCell<'a, T> {
+    /// Reset this permutator so calling next will continue
+    /// permutation on current permuted data.
+    /// It will not reset permuted data.
+    fn reset(&mut self) {
+        self.i = 0;
+        self.c.iter_mut().for_each(|c| {*c = 0;});
+    }
+}
+
 /// Create a combination iterator.
 /// It use Gosper's algorithm to pick a combination out of
 /// given data. The produced combination provide no lexicographic
@@ -1802,6 +1971,7 @@ impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
 /// combinations:
 /// [1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4], [1, 2, 5],
 /// [1, 3, 5], [2, 3, 5], [1, 4, 5], [2, 4, 5], [3, 4, 5]
+/// Here's an example of code printing above combination.
 /// ```
 ///    use permutator::GosperCombination;
 ///    use std::time::{Instant};
@@ -1810,8 +1980,28 @@ impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
 ///    let timer = Instant::now();
 ///
 ///    for combination in gosper {
-///        // uncomment a line below to print each combination
-///        // println!("{}:{:?}", counter, combination);
+///        println!("{}:{:?}", counter, combination);
+///        counter += 1;
+///    }
+///
+///    println!("Total {} combinations in {:?}", counter, timer.elapsed());
+/// ```
+/// Similar to above code but return value into Rc<RefCell<>> to be able
+/// to share result with multiple object use example code below
+/// ```
+///    use permutator::{GosperCombination, IteratorCell};
+///    use std::cell::RefCell;
+///    use std::rc::Rc;
+///    use std::time::{Instant};
+///    let data = &[1, 2, 3, 4, 5];
+///    let result : &mut[&i32] = &mut [&data[0]; 3];
+///    let shared = Rc::new(RefCell::new(result));
+///    let mut gosper = GosperCombination::new(&[1, 2, 3, 4, 5], 3);
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///
+///    while let Some(_) = gosper.next_into_cell(&shared) {
+///        println!("{}:{:?}", counter, shared);
 ///        counter += 1;
 ///    }
 ///
@@ -1828,6 +2018,7 @@ impl<'a, T> Iterator for HeapPermutation<'a, T> where T : Clone {
 pub struct GosperCombination<'a, T> where T : 'a {
     data : &'a [T], // data to generate a combination
     len : usize, // total possible number of combination.
+    r : usize, // a size of combination.
     x : u128, // A binary map to generate combination
 }
 
@@ -1846,6 +2037,7 @@ impl<'a, T> GosperCombination<'a, T> {
         GosperCombination {
             data : data,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
+            r : r,
             x : x
         }
     }
@@ -1885,42 +2077,6 @@ impl<'a, T> GosperCombination<'a, T> {
 
         Some(())
     }
-
-    /// Attempt to get next combination and store it into Rc<RefCell<>> 
-    /// of mutable slice `result` to store the next combination.
-    /// This function mimic Iterator's next style.
-    /// It'll return an empty Option because result will be
-    /// contain in given paramter.
-    /// It return `None` when there's no further possible combination.
-    /// 
-    /// Use this function when you want a faster than copy/clone but need to
-    /// share the combination to multiple target.
-    /// 
-    /// The test in uncontrol environment found that using this function yield
-    /// performance on par with [combination_cell](fn.combination_cell.html) function.
-    pub fn next_into_cell(&mut self, result : &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
-        let mut j = 0;
-        let mut i = 0;
-        let mut mask = self.x;
-        while mask > 0 && j < self.data.len() {
-            if mask & 1 == 1 {
-                result.borrow_mut()[i] = &self.data[j];
-                i += 1;
-            }
-
-            mask >>= 1;
-            j += 1;
-        }
-
-        if mask != 0 {
-            return None
-        }
-
-        // gosper_combination(&mut self.x);
-        stanford_combination(&mut self.x); // enhanced Gosper algorithm done by Stanford university
-
-        Some(())
-    }
 }
 
 impl<'a, T> IntoIterator for GosperCombination<'a, T> {
@@ -1930,6 +2086,7 @@ impl<'a, T> IntoIterator for GosperCombination<'a, T> {
     fn into_iter(self) -> CombinationIterator<'a, T> {
         CombinationIterator {
             data : self.data,
+            r : self.r,
             x : self.x
         }
     }
@@ -1939,6 +2096,7 @@ impl<'a, T> IntoIterator for GosperCombination<'a, T> {
 /// or from [trait Combination](trait.Combination.html) over slice or vec of data.
 pub struct CombinationIterator<'a, T> where T : 'a {
     data : &'a [T], // original data
+    r : usize, // len of each combination
     x : u128, // Gosper binary map
 }
 
@@ -1966,6 +2124,90 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
         stanford_combination(&mut self.x);
 
         return Some(combination)
+    }
+}
+
+impl<'a, T> IteratorCell for CombinationIterator<'a, T> {
+    type Item = &'a mut[&'a T];
+
+    fn next_into_cell(&mut self, result : &Rc<RefCell<&mut[&'a T]>>) -> Option<()> {
+
+        if 128 - self.x.leading_zeros() as usize > self.data.len() {
+            return None
+        } else {
+            let mut i = 0;
+            let mut j = 0;
+            let mut mask = self.x;
+            while mask > 0 {
+                if mask & 1 == 1 {
+                    result.borrow_mut()[i] = &self.data[j];
+                    i += 1;
+                }
+
+                mask >>= 1;
+                j += 1;
+            }
+        }
+
+        stanford_combination(&mut self.x);
+
+        return Some(())
+    }
+}
+
+impl<'a, T> IteratorReset for CombinationIterator<'a, T> {
+    fn reset(&mut self) {
+        self.x = 1;
+        self.x <<= self.r;
+        self.x -= 1;
+    }
+}
+
+impl<'a, T> IteratorCell for GosperCombination<'a, T> {
+    type Item = &'a mut[&'a T];
+
+    /// Attempt to get next combination and store it into Rc<RefCell<>> 
+    /// of mutable slice `result` to store the next combination.
+    /// This function mimic Iterator's next style.
+    /// It'll return an empty Option because result will be
+    /// contain in given paramter.
+    /// It return `None` when there's no further possible combination.
+    /// 
+    /// Use this function when you want a faster than copy/clone but need to
+    /// share the combination to multiple target.
+    /// 
+    /// The test in uncontrol environment found that using this function yield
+    /// performance on par with [combination_cell](fn.combination_cell.html) function.
+    fn next_into_cell(&mut self, result : &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
+        let mut j = 0;
+        let mut i = 0;
+        let mut mask = self.x;
+        while mask > 0 && j < self.data.len() {
+            if mask & 1 == 1 {
+                result.borrow_mut()[i] = &self.data[j];
+                i += 1;
+            }
+
+            mask >>= 1;
+            j += 1;
+        }
+
+        if mask != 0 {
+            return None
+        }
+
+        // gosper_combination(&mut self.x);
+        stanford_combination(&mut self.x); // enhanced Gosper algorithm done by Stanford university
+
+        Some(())
+    }
+}
+
+impl<'a, T> IteratorReset for GosperCombination<'a, T> {
+    fn reset(&mut self) {
+        self.x = 1;
+        self.x <<= self.r;
+        self.x -= 1;
     }
 }
 
@@ -2011,14 +2253,37 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
 ///    use permutator::KPermutation;
 ///    use std::time::Instant;
 ///    let data = [1, 2, 3, 4, 5];
+///    let result = &mut [&data[0]; 3];
 ///    let mut permutator = KPermutation::new(&data, 3);
 ///    let mut counter = 0;
 ///    // println!("Begin testing KPermutation");
 ///    let timer = Instant::now();
 ///
-///    while let Some(permuted) = permutator.next() {
+///    while let Some(_) = permutator.next(result) {
 ///        // uncomment the line below to print all possible value
 ///        // println!("{}:{:?}", counter, permuted);
+///        counter += 1;
+///    }
+///
+///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+///    assert_eq!(60, counter);
+/// ```
+/// - Manual iterative style and return result inside Rc<RefCell<>> for sharing
+/// with multiple targets purpose.
+/// ```
+///    use permutator::{KPermutation, IteratorCell};
+///    use std::cell::RefCell;
+///    use std::rc::Rc;
+///    use std::time::Instant;
+///    let data = [1, 2, 3, 4, 5];
+///    let mut result : Vec<&i32> = vec![&data[0]; 3];
+///    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+///    let mut permutator = KPermutation::new(&data, 3);
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///
+///    while let Some(_) = permutator.next_into_cell(&shared) {
+///        println!("{}:{:?}", counter, &*shared.borrow());
 ///        counter += 1;
 ///    }
 ///
@@ -2092,64 +2357,6 @@ impl<'a, T> KPermutation<'a, T> {
         self.len
     }
 
-    /// Mimic iterator's `next` function but return a reference to
-    /// current permuted store inside this struct instead of
-    /// create a copy of permuted data like actual `next` function
-    /// implemented in `Iterator` trait.
-    pub fn next(&mut self) -> Option<&[&T]> {
-        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
-            if let Some(ref mut perm) = *permutator {
-                if let Some(_) = perm.next() {
-                    // get next permutation of current permutator
-                    Some(())
-                } else {
-                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                        // now perm suppose to be new permutator.
-                        Some(())
-                    } else {
-                        // all combination permuted
-                        return None;
-                    }
-                }
-            } else {
-                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                    if let Some(_) = *permutator {
-                        Some(())
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
-            if let Some(_) = combinator.next(&mut *permuted) {
-                if let Some(ref mut permutator) = *permutator {
-                    permutator.reset(); // fresh new permutator
-                    Ok(())
-                } else {
-                    // first time getting a permutator, need to create one.
-                    let new_permutator = HeapPermutation::new(&mut *permuted);
-                    *permutator = Some(new_permutator);
-                    Ok(())
-                }
-            } else {
-                Err(())
-            }
-        }
-        unsafe {
-            let permutator = &mut self.permutator as *mut Option<HeapPermutation<'a, &'a T>>;
-            let permuted = &mut self.permuted as *mut Vec<&'a T>;
-            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
-                return Some(&self.permuted);
-            } else {
-                return None;
-            }
-        }
-    }
-
     /// Mimic iterator's `next` function but return next permutation
     /// into Rc<RefCell<>> of mutable slice instead.
     /// This function is intended to return a sharable result without
@@ -2157,8 +2364,8 @@ impl<'a, T> KPermutation<'a, T> {
     /// The mutable slice inside Rc<RefCell<>> is the reference to 
     /// internal data within this object. 
     /// Any modification made to result may cause undesired behavior.
-    pub fn next_into_cell(&mut self, result : &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
-        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
+    pub fn next(&mut self, result : &mut [&'a T]) -> Option<()> {
+        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut [&'a T], permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
             if let Some(ref mut perm) = *permutator {
                 if let Some(_) = perm.next() {
                     // get next permutation of current permutator
@@ -2185,7 +2392,7 @@ impl<'a, T> KPermutation<'a, T> {
             }
         }
 
-        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
+        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut [&'a T], permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
             if let Some(_) = combinator.next(&mut *permuted) {
                 if let Some(ref mut permutator) = *permutator {
                     permutator.reset(); // fresh new permutator
@@ -2202,9 +2409,7 @@ impl<'a, T> KPermutation<'a, T> {
         }
         unsafe {
             let permutator = &mut self.permutator as *mut Option<HeapPermutation<'a, &'a T>>;
-            let permuted = &mut self.permuted as *mut Vec<&'a T>;
-            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
-                result.replace(&mut *permuted);
+            if let Some(_) = get_next(&mut self.combinator, result as *mut [&T], permutator) {
                 return Some(());
             } else {
                 return None;
@@ -2268,6 +2473,79 @@ impl<'a, T> Iterator for KPermutation<'a, T> {
                 return None;
             }
         }
+    }
+}
+
+impl<'a, T> IteratorCell for KPermutation<'a, T> {
+    type Item = &'a mut[&'a T];
+
+    /// Mimic iterator's `next` function but return next permutation
+    /// into Rc<RefCell<>> of mutable slice instead.
+    /// This function is intended to return a sharable result without
+    /// deep copy of each permutation.
+    /// The mutable slice inside Rc<RefCell<>> is the reference to 
+    /// internal data within this object. 
+    /// Any modification made to result may cause undesired behavior.
+    fn next_into_cell(&mut self, result : &Rc<RefCell<&mut [&'a T]>>) -> Option<()> {
+        unsafe fn get_next<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Option<()> {
+            if let Some(ref mut perm) = *permutator {
+                if let Some(_) = perm.next() {
+                    // get next permutation of current permutator
+                    Some(())
+                } else {
+                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                        // now perm suppose to be new permutator.
+                        Some(())
+                    } else {
+                        // all combination permuted
+                        return None;
+                    }
+                }
+            } else {
+                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+                    if let Some(_) = *permutator {
+                        Some(())
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            }
+        }
+
+        unsafe fn next_permutator<'a, T>(combinator : &mut GosperCombination<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutation<'a, &'a T>>) -> Result<(), ()> {
+            if let Some(_) = combinator.next(&mut *permuted) {
+                if let Some(ref mut permutator) = *permutator {
+                    permutator.reset(); // fresh new permutator
+                    Ok(())
+                } else {
+                    // first time getting a permutator, need to create one.
+                    let new_permutator = HeapPermutation::new(&mut *permuted);
+                    *permutator = Some(new_permutator);
+                    Ok(())
+                }
+            } else {
+                Err(())
+            }
+        }
+        unsafe {
+            let permutator = &mut self.permutator as *mut Option<HeapPermutation<'a, &'a T>>;
+            let permuted = &mut self.permuted as *mut Vec<&'a T>;
+            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+                result.replace(&mut *permuted);
+                return Some(());
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+impl<'a, T> IteratorReset for KPermutation<'a, T> {
+    fn reset(&mut self) {
+        self.combinator.reset();
+        self.permutator = None;
     }
 }
 
@@ -2439,6 +2717,7 @@ impl<T> Combination<T> for [T] {
 
         CombinationIterator {
             data : self,
+            r : k,
             x : x
         }
     }
@@ -2451,14 +2730,17 @@ impl<T> Combination<T> for Vec<T> {
         
         CombinationIterator {
             data : self,
+            r : k,
             x : x
         }
     }
 }
 
 /// Create a permutation iterator that permute data in place.
-/// It return an object of [HeapPermutation](struct.HeapPermutation.html)
-/// which can be used as iterator or manual iterate for higher throughput.
+/// Built-in implementation return an object of 
+/// [HeapPermutation](struct.HeapPermutation.html) for slice/array and Vec.
+/// It return an object of [HeapPermutationCell](struct.HeapPermutationCell.html)
+/// on data type of `Rc<RefCell<&mut [T]>>`.
 /// 
 /// # Example
 /// For typical permutation:
@@ -2491,15 +2773,28 @@ impl<T> Combination<T> for Vec<T> {
 /// # See 
 /// - [HeapPermutation](struct.HeapPermutation.html) for more detail
 /// about how to use [HeapPermutation](struct.HeapPermutation.html).
+/// - [HeapPermutationCell](struct.HeapPermutationCell.html) for more detail 
+/// about how to use [HeapPermutationCell](struct.HeapPermutationCell.html)
 /// - [Example implementation](trait.Permutation.html#foreign-impls) on foreign type
-pub trait Permutation<T> {
+pub trait Permutation<'a> {
+    /// A permutation generator for a collection of data.
+    /// # See
+    /// - [Foreign implementation for an example different return type](trait.Permutation.html#foreign-impls)
+    type Permutator : Iterator;
+
     /// Create a permutation based on Heap's algorithm.
     /// It return [HeapPermutation](struct.HeapPermutation.html) object.
-    fn permutation(&mut self) -> HeapPermutation<T>;
+    fn permutation(&'a mut self) -> Self::Permutator;
 }
 
-impl<T> Permutation<T> for [T] {
-    fn permutation(&mut self) -> HeapPermutation<T> {
+/// Generate permutation on an array or slice of T
+/// It return [HeapPermutation](struct.HeapPermutation.html)
+impl<'a, T> Permutation<'a> for [T] where T : 'a + Clone {
+    /// Use [HeapPermutation](struct.HeapPermutation.html)
+    /// as permutation generator
+    type Permutator = HeapPermutation<'a, T>;
+
+    fn permutation(&'a mut self) -> HeapPermutation<T> {
         HeapPermutation {
             c : vec![0; self.len()],
             data : self,
@@ -2508,11 +2803,33 @@ impl<T> Permutation<T> for [T] {
     }
 }
 
-impl<T> Permutation<T> for Vec<T> {
-    fn permutation(&mut self) -> HeapPermutation<T> {
+/// Generate permutation on a Vec of T
+/// It return [HeapPermutation](struct.HeapPermutation.html)
+impl<'a, T> Permutation<'a> for Vec<T> where T : 'a + Clone {
+    /// Use [HeapPermutation](struct.HeapPermutation.html)
+    /// as permutation generator
+    type Permutator = HeapPermutation<'a, T>;
+
+    fn permutation(&'a mut self) -> HeapPermutation<T> {
         HeapPermutation {
             c : vec![0; self.len()],
             data : self,
+            i : 0
+        }
+    }
+}
+
+/// Generate a sharable permutation inside `Rc<RefCell<&mut [T]>>`
+/// It return [HeapPermutationCell](struct.HeapPermutationCell.html)
+impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a {
+    /// Use [HeapPermutationCell](struct.HeapPermutationCell.html)
+    /// as permutation generator
+    type Permutator = HeapPermutationCell<'a, T>;
+
+    fn permutation(&'a mut self) -> HeapPermutationCell<T> {
+        HeapPermutationCell {
+            c : vec![0; self.borrow().len()],
+            data : Rc::clone(self),
             i : 0
         }
     }
@@ -2948,14 +3265,53 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
+    fn test_CartesianProduct_reset() {
+        use std::time::Instant;
+        let data : &[&[usize]] = &[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]];
+        let mut cart = CartesianProduct::new(&data);
+        let mut counter = 0;
+        let mut result : Vec<&usize> = vec![&data[0][0]; data.len()];
+        let timer = Instant::now();
+
+        while let Some(_) = cart.next(result.as_mut_slice()) {
+            counter += 1;
+        }
+
+        let all_possible = data.iter().fold(1, |cum, domain| {cum * domain.len()});
+        assert_eq!(all_possible, counter);
+
+        counter = 0;
+        // it shall end immediately because it's already exhausted
+        while let Some(_) = cart.next(result.as_mut_slice()) {
+            counter += 1;
+        }
+
+        assert_eq!(0, counter);
+
+        cart.reset();
+        counter = 0;
+        
+        // now it shall start iterating again.
+        while let Some(_) = cart.next(result.as_mut_slice()) {
+            counter += 1;
+        }
+
+        assert_eq!(all_possible, counter); 
+
+        println!("Total {} products done in {:?}", counter, timer.elapsed());
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
     fn test_CartesianProduct_mimic_iterator() {
         use std::time::Instant;
         let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9]];
+        let mut result : Vec<&usize> = vec![&data[0][0]; data.len()];
         let mut cart = CartesianProduct::new(&data);
         let mut counter = 0;
         let timer = Instant::now();
 
-        while let Some(p) = cart.next() {
+        while let Some(p) = cart.next(result.as_mut_slice()) {
             // println!("{:?}", p);
             counter += 1;
         }
@@ -3013,6 +3369,44 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
+    fn test_HeapPermutation_reset() {
+        use std::time::{Instant};
+        let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
+        // let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        println!("0:{:?}", data);
+        let mut permutator = HeapPermutation::new(&mut data);
+        let timer = Instant::now();
+        let mut counter = 1;
+
+        while let Some(permutated) = permutator.next() {
+            // println!("{}:{:?}", counter, permutated);
+            counter += 1;
+        }
+
+        assert_eq!(6, counter);
+
+        let mut counter = 1;
+
+        while let Some(permutated) = permutator.next() {
+            // println!("{}:{:?}", counter, permutated);
+            counter += 1;
+        }
+
+        assert_eq!(1, counter);
+        
+        permutator.reset();
+        let mut counter = 1;
+
+        while let Some(permutated) = permutator.next() {
+            // println!("{}:{:?}", counter, permutated);
+            counter += 1;
+        }
+
+        assert_eq!(6, counter);
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
     fn test_HeapPermutationIterator() {
         use std::time::{Instant};
         let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
@@ -3043,6 +3437,27 @@ pub mod test {
         let mut counter = 1;
 
         permutator.into_iter().for_each(|permutated| {counter += 1;});
+
+        println!("Done {} permutations in {:?}", counter, timer.elapsed());
+        assert_eq!(6, counter);
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_HeapPermutationCellIterator() {
+        use std::time::{Instant};
+        let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
+        let shared = Rc::new(RefCell::new(data.as_mut_slice()));
+        // let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let permutator = HeapPermutationCell::new(Rc::clone(&shared));
+        println!("{}:{:?}", 0, &*shared.borrow()); 
+        let timer = Instant::now();
+        let mut counter = 1;
+
+        for _ in permutator {
+            // println!("{}:{:?}", counter, &*shared.borrow());
+            counter += 1;
+        }
 
         println!("Done {} permutations in {:?}", counter, timer.elapsed());
         assert_eq!(6, counter);
@@ -3087,6 +3502,42 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
+    fn test_GosperCombinationIteratorAlike_reset() {
+        use std::time::{Instant};
+        let data = &[1, 2, 3, 4, 5];
+        let r = 3;
+        let mut gosper = GosperCombination::new(data, r);
+        let mut counter = 0;
+        let timer = Instant::now();
+        let mut result = vec![&data[0]; r];
+
+        while let Some(_) = gosper.next(&mut result) {
+            // println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+
+        println!("Total {} combinations in {:?}", counter, timer.elapsed());
+        let all_possible = divide_factorial(data.len(), r) / factorial(data.len() - r);
+        assert_eq!(all_possible, counter);
+        counter = 0;
+
+        while let Some(_) = gosper.next(&mut result) {
+            // println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+        assert_eq!(0, counter);
+        gosper.reset();
+        counter = 0;
+
+        while let Some(_) = gosper.next(&mut result) {
+            // println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+        assert_eq!(all_possible, counter);
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
     fn test_KPermutation() {
         use std::time::Instant;
         let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
@@ -3095,13 +3546,56 @@ pub mod test {
         // println!("Begin testing KPermutation");
         let timer = Instant::now();
 
-        while let Some(permuted) = permutator.next() {
+        for permuted in permutator {
             // println!("{}:{:?}", counter, permuted);
             counter += 1;
         }
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
         assert_eq!(51891840, counter);
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_KPermutation_reset() {
+        use std::time::Instant;
+        let data = [1, 2, 3, 4, 5];
+        let k = 3;
+        let mut result = vec![&data[0]; k];
+        let mut permutator = KPermutation::new(&data, k);
+        let mut counter = 0;
+        // println!("Begin testing KPermutation");
+        let timer = Instant::now();
+
+        while let Some(_) = permutator.next(result.as_mut_slice()) {
+            // println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        }
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
+
+        counter = 0;
+
+        // it shall end upon enter as it was previously exhausted
+        while let Some(_) = permutator.next(result.as_mut_slice()) {
+            // println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        }
+
+        assert_eq!(0, counter);
+
+        permutator.reset();
+
+        counter = 0;
+
+        // it shall end upon enter as it was previously exhausted
+        while let Some(_) = permutator.next(result.as_mut_slice()) {
+            // println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        }
+
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
     }
 
     #[allow(non_snake_case, unused)]
@@ -3168,6 +3662,21 @@ pub mod test {
         }
 
         assert_eq!(counter, factorial(data.len()));
+    }
+
+    #[test]
+    fn test_permutation_trait_cell() {
+        let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
+        let mut shared = Rc::new(RefCell::new(data));
+        let value = Rc::clone(&shared);
+        println!("{:?}", &*shared.borrow());
+        let mut counter = 1;
+        shared.permutation().for_each(|_| {
+            println!("{:?}", &*value.borrow());
+            counter += 1;
+        });
+
+        assert_eq!(counter, factorial(value.borrow().len()));
     }
 
     #[test]
@@ -3391,8 +3900,8 @@ pub mod test {
         let t1_dat = Arc::clone(&result_sync);
         thread::spawn(move || {
             while let Some(_) = t1_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t1_dat.read().unwrap();
-                // println!("Thread1: {:?}", result);
+                let _result : &Vec<&i32> = &*t1_dat.read().unwrap();
+                // println!("Thread1: {:?}", _result);
                 t1_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread1 is done");
@@ -3404,8 +3913,8 @@ pub mod test {
         let t2_local = main_send.clone();
         thread::spawn(move || {
             while let Some(_) = t2_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t2_dat.read().unwrap();
-                // println!("Thread2: {:?}", result);
+                let _result : &Vec<&i32> = &*t2_dat.read().unwrap();
+                // println!("Thread2: {:?}", _result);
                 t2_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread2 is done");
@@ -3428,8 +3937,8 @@ pub mod test {
 
         thread::spawn(move || {
             while let Some(c) = t1_recv.recv().unwrap() {
-                let result : Vec<&i32> = c;
-                // println!("Thread1: {:?}", result);
+                let _result : Vec<&i32> = c;
+                // println!("Thread1: {:?}", _result);
             }
             println!("Thread1 is done");
         });
@@ -3438,8 +3947,8 @@ pub mod test {
         let (t2_send, t2_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
         thread::spawn(move || {
             while let Some(c) = t2_recv.recv().unwrap() {
-                let result : Vec<&i32> = c;
-                // println!("Thread2: {:?}", result);
+                let _result : Vec<&i32> = c;
+                // println!("Thread2: {:?}", _result);
             }
             println!("Thread2 is done");
         });
@@ -3690,8 +4199,8 @@ pub mod test {
         let t1_dat = Arc::clone(&result_sync);
         thread::spawn(move || {
             while let Some(_) = t1_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t1_dat.read().unwrap();
-                // println!("Thread1: {:?}", result);
+                let _result : &Vec<&i32> = &*t1_dat.read().unwrap();
+                // println!("Thread1: {:?}", _result);
                 t1_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread1 is done");
@@ -3703,8 +4212,8 @@ pub mod test {
         let t2_local = main_send.clone();
         thread::spawn(move || {
             while let Some(_) = t2_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t2_dat.read().unwrap();
-                // println!("Thread2: {:?}", result);
+                let _result : &Vec<&i32> = &*t2_dat.read().unwrap();
+                // println!("Thread2: {:?}", _result);
                 t2_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread2 is done");
@@ -3729,8 +4238,8 @@ pub mod test {
         let t1_dat = Arc::clone(&result_sync);
         thread::spawn(move || {
             while let Some(_) = t1_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t1_dat.read().unwrap();
-                // println!("Thread1: {:?}", result);
+                let _result : &Vec<&i32> = &*t1_dat.read().unwrap();
+                // println!("Thread1: {:?}", _result);
             }
             println!("Thread1 is done");
         });
@@ -3740,8 +4249,8 @@ pub mod test {
         let t2_dat = Arc::clone(&result_sync);
         thread::spawn(move || {
             while let Some(_) = t2_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t2_dat.read().unwrap();
-                // println!("Thread2: {:?}", result);
+                let _result : &Vec<&i32> = &*t2_dat.read().unwrap();
+                // println!("Thread2: {:?}", _result);
             }
             println!("Thread2 is done");
         });
@@ -3754,7 +4263,7 @@ pub mod test {
             let mut counter = 0;
             let timer = Instant::now();
             
-            cart.into_iter().for_each(|p| {
+            cart.into_iter().for_each(|_| {
                 consumers.iter().for_each(|c| {
                     c.send(Some(())).unwrap();
                 });
@@ -3942,8 +4451,8 @@ pub mod test {
         let t1_dat = Arc::clone(&result_sync);
         thread::spawn(move || {
             while let Some(_) = t1_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t1_dat.read().unwrap();
-                // println!("Thread1: {:?}", result);
+                let _result : &Vec<&i32> = &*t1_dat.read().unwrap();
+                // println!("Thread1: {:?}", _result);
                 t1_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread1 is done");
@@ -3955,8 +4464,8 @@ pub mod test {
         let t2_local = main_send.clone();
         thread::spawn(move || {
             while let Some(_) = t2_recv.recv().unwrap() {
-                let result : &Vec<&i32> = &*t2_dat.read().unwrap();
-                // println!("Thread2: {:?}", result);
+                let _result : &Vec<&i32> = &*t2_dat.read().unwrap();
+                // println!("Thread2: {:?}", _result);
                 t2_local.send(()).unwrap(); // notify generator thread that reference is no longer neeed.
             }
             println!("Thread2 is done");
@@ -3979,8 +4488,8 @@ pub mod test {
 
         thread::spawn(move || {
             while let Some(c) = t1_recv.recv().unwrap() {
-                let result : Vec<&i32> = c;
-                // println!("Thread1: {:?}", result);
+                let _result : Vec<&i32> = c;
+                // println!("Thread1: {:?}", _result);
             }
             println!("Thread1 is done");
         });
@@ -3989,8 +4498,8 @@ pub mod test {
         let (t2_send, t2_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
         thread::spawn(move || {
             while let Some(c) = t2_recv.recv().unwrap() {
-                let result : Vec<&i32> = c;
-                // println!("Thread2: {:?}", result);
+                let _result : Vec<&i32> = c;
+                // println!("Thread2: {:?}", _result);
             }
             println!("Thread2 is done");
         });
