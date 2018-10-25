@@ -140,7 +140,7 @@ the permutated value inside it.
 - use `reset` function instead of creating a new Iterator everytime you need to completely re-permutation again.
 ### Trait
 This crate provides `Permutation` trait and basic implementation on generic slice/array and generic Vec as well as Rc<RefCell<&mut [T]>>. It add `permutation` function on the slice/array, Vec, and
-Rc<RefCell<&mut [T]>>. There's some usage different on how to iterate over permutation of slice/array/Vec than Rc<RefCell<&mut [T]>>. See an example of [permutation on slice/array/Vec here](#traits-that-add-new-function-to-t-or-vect) and [another example of permutation on Rc<RefCell<&mut [T]>>](#traits-that-add-new-function-to-rcrefcellmut-t)
+Rc<RefCell<&mut [T]>>. There's some usage different on how to iterate over permutation of slice/array/Vec than Rc<RefCell<&mut [T]>>. See [an example of permutation on slice/array/Vec here](#traits-that-add-new-function-to-t-or-vect) and [another example of permutation on Rc<RefCell<&mut [T]>>](#traits-that-add-new-function-to-rcrefcellmut-t)
 ### Callback function
 This crate provide 3 functions that serve different usecase.
 - `heap_permutation` function that return product as callback parameter
@@ -424,7 +424,7 @@ while let Some(_) = kperm.next_into_cell(&shared) {
 `Combination` trait add `combination` function.
 The function take 1 parameter. It's a size of combination frame.
 The function return the same Iterator that also return by 
-the [provided struct](#iterator-style-permutationscombinations)
+the [provided struct](#iterator-2)
 so it can be used like [this example](#iterator-alike-sharable-permutation-example)
 ```Rust
 use permutator::Combination;
@@ -436,7 +436,7 @@ data.combination(3).for_each(|comb| {
 ```
 `Permutation` trait add `permutation` function.
 It permute the `[T]` or `Vec<T>` in place. 
-The function return the same Iterator that also return by the [provided struct](#iterator-style-permutationscombinations)
+The function return the same Iterator that also return by the [provided struct](#iterator-2)
 so it can be used like [this example](#iterator-style-permutation-example)
 or [this example](#mimic-iterator-style-permutation-example)
 ```Rust
