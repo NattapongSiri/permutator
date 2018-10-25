@@ -64,7 +64,7 @@ impl<'a, T> Permutation<'a> for [T] where T : 'a {
     }
 }
 ```
-The added complexity let this trait add applicable to wider type.
+The added complexity make this trait applicable to wider type.
 Here's new implemention on `Rc<RefCell<&mut [T]>>` which return `HeapPermutationCell`.
 ```Rust
 impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a {
@@ -140,7 +140,7 @@ the permutated value inside it.
 - use `reset` function instead of creating a new Iterator everytime you need to completely re-permutation again.
 ### Trait
 This crate provides `Permutation` trait and basic implementation on generic slice/array and generic Vec as well as Rc<RefCell<&mut [T]>>. It add `permutation` function on the slice/array, Vec, and
-Rc<RefCell<&mut [T]>>. There's some usage different on how to iterate over permutation of slice/array/Vec than Rc<RefCell<&mut [T]>>. See an example of permutation of [slice/array/Vec](#traits-that-add-new-function-to-t-or-vect) and [Rc<RefCell<&mut [T]>>]
+Rc<RefCell<&mut [T]>>. There's some usage different on how to iterate over permutation of slice/array/Vec than Rc<RefCell<&mut [T]>>. See an example of [permutation on slice/array/Vec here](#traits-that-add-new-function-to-t-or-vect) and [another example of permutation on Rc<RefCell<&mut [T]>>](#traits-that-add-new-function-to-rcrefcellmut-t)
 ### Callback function
 This crate provide 3 functions that serve different usecase.
 - `heap_permutation` function that return product as callback parameter
