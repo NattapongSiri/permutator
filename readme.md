@@ -470,6 +470,7 @@ and callback function `_cell` suffix. For example:
 3. Result synchronization, both in single and multiple thread(s).
 4. ...
 5. All other unsafe Rust conditions applied
+
 Example:
 - unsafe callback function
 ```Rust
