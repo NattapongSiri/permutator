@@ -2815,27 +2815,6 @@ impl<'a, T> ExactSizeIterator for HeapPermutationCellIter<'a, T> {
 ///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
 ///    assert_eq!(60, counter);
 /// ```
-/// - Manual iterative style which yield higher throughput because it return
-/// a reference to internal slice stored inside the struct.
-/// ```
-///    use permutator::KPermutationIterator;
-///    use std::time::Instant;
-///    let data = [1, 2, 3, 4, 5];
-///    let result = &mut [&data[0]; 3];
-///    let mut permutator = KPermutationIterator::new(&data, 3);
-///    let mut counter = 0;
-///    // println!("Begin testing KPermutation");
-///    let timer = Instant::now();
-///
-///    while let Some(_) = permutator.next(result) {
-///        // uncomment the line below to print all possible value
-///        // println!("{}:{:?}", counter, permuted);
-///        counter += 1;
-///    }
-///
-///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
-///    assert_eq!(60, counter);
-/// ```
 /// 
 /// # Limitation
 /// Gosper algorithm need to know the MSB (most significant bit).
@@ -2843,9 +2822,6 @@ impl<'a, T> ExactSizeIterator for HeapPermutationCellIter<'a, T> {
 /// This make the implementation support up to 128 elements slice.
 /// 
 /// # Notes
-/// This struct manual iteration performance is about 110% slower than using 
-/// [k-permutation](fn.k_permutation.html) function
-/// while the slowest using Iterator style is about 2300% slower.
 /// The additional functionality provided by this struct is that it can be
 /// pause or completely stop midway while the [k-permutation](fn.k_permutation.html)
 /// need to be run from start to finish only.
@@ -4507,8 +4483,8 @@ pub mod test {
     #[test]
     fn test_GosperCombinationIteratorUnsafe() {
         use std::time::{Instant};
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
-        let r = 7;
+        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let r = 3;
         let mut counter = 0;
         let timer = Instant::now();
         let mut result = vec![&data[0]; r];
@@ -4529,8 +4505,8 @@ pub mod test {
     #[test]
     fn test_GosperCombinationCellIter() {
         use std::time::{Instant};
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26];
-        let r = 7;
+        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let r = 3;
         let mut counter = 0;
         let timer = Instant::now();
         let mut result = vec![&data[0]; r];
@@ -4590,8 +4566,9 @@ pub mod test {
     #[test]
     fn test_KPermutation() {
         use std::time::Instant;
-        let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-        let mut permutator = KPermutationIterator::new(&data, 8);
+        let data = [1, 2, 3, 4, 5];
+        let k = 3;
+        let mut permutator = KPermutationIterator::new(&data, k);
         let mut counter = 0;
         // println!("Begin testing KPermutation");
         let timer = Instant::now();
@@ -4602,15 +4579,16 @@ pub mod test {
         }
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
-        assert_eq!(51891840, counter);
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
     }
 
     #[allow(non_snake_case, unused)]
     #[test]
     fn test_KPermutationIterator() {
         use std::time::Instant;
-        let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-        let permutator = KPermutationIterator::new(&data, 8);
+        let data = [1, 2, 3, 4, 5];
+        let k = 3;
+        let permutator = KPermutationIterator::new(&data, k);
         let mut counter = 0;
         // println!("Begin testing KPermutation");
         let timer = Instant::now();
@@ -4621,7 +4599,7 @@ pub mod test {
         }
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
-        assert_eq!(51891840, counter);
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
     }
 
     #[allow(non_snake_case)]
@@ -4831,15 +4809,15 @@ pub mod test {
     fn test_KPermutation_into_Ref_trait() {
         use std::time::Instant;
 
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let data : &[i32] = &[1, 2, 3, 4, 5];
         let mut counter = 0;
-        let k = 7;
+        let k = 3;
         let mut result : Vec<&i32> = vec![&data[0]; k];
         let shared = result.as_mut_slice() as *mut [&i32];
         let timer = Instant::now();
         unsafe {
             (data, k, shared).permutation().for_each(|_| {
-                // println!("{:?}", &*shared);
+                println!("{:?}", &*shared);
                 counter += 1;
             });
 
@@ -5490,7 +5468,7 @@ pub mod test {
         }
         impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
             fn consume(&self) {
-                // println!("Work1 has {:?}", self.data.borrow());
+                println!("Work1 has {:?}", self.data.borrow());
             }
         }
         struct Worker2<'a, T : 'a> {
@@ -5498,7 +5476,7 @@ pub mod test {
         }
         impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
             fn consume(&self) {
-                // println!("Work2 has {:?}", self.data.borrow());
+                println!("Work2 has {:?}", self.data.borrow());
             }
         }
 
@@ -5507,16 +5485,16 @@ pub mod test {
             let timer = Instant::now();
             let mut counter = 0;
             k_permutation_cell(data, k, cur_result, || {
-                // consumers.iter().for_each(|c| {
-                //     c.consume();
-                // })
+                consumers.iter().for_each(|c| {
+                    c.consume();
+                });
                 counter += 1;
             });
             
             println!("Total {} permutation done in {:?}", counter, timer.elapsed());
         }
-        let k = 7;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 3;
+        let data = &[1, 2, 3, 4, 5];
         let mut result = vec![&data[0]; k];
         let shared = Rc::new(RefCell::new(result.as_mut_slice()));
 
@@ -5573,7 +5551,7 @@ pub mod test {
         let timer = Instant::now();
         let mut counter = 0;
         for _ in kperm {
-            // consumers.iter().for_each(|c| {c.consume();});
+            consumers.iter().for_each(|c| {c.consume();});
             counter += 1;
         }
 
