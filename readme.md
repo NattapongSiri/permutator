@@ -404,22 +404,6 @@ let shared = Rc::new(RefCell::new(result.as_mut_slice()));
     // and notify all owner of shared object so they know that new combination is available.
 });
 ```
-or k-permutation into Rc<RefCell<>>
-```Rust
-use permutator::KPermutationCellIter;
-use std::cell::RefCell;
-use std::rc::Rc;
-
-let k = 3;
-let data = &[1, 2, 3, 4, 5];
-let mut result = vec![&data[0]; k];
-let shared = Rc::new(RefCell::new(result.as_mut_slice()));
-
-(data, k, Rc::clone(&shared)).permutation().for_each(|_| {
-    // each permutation will be stored in `shared`
-    println!("{:?}", &*shared.borrow());
-});
-```
 `Permutation` trait add `permutation` function.
 It permute the `[T]`, `Vec<T>`, or Rc<RefCell<&mut [T]>> in place. 
 The function return the same Iterator that also return by the either
@@ -449,6 +433,22 @@ Rc::clone(&shared).permutation().for_each(|_| {
     // and notify all owner of shared object so they know that new permutation is available.
 });
 // The same goes as previous example, the data inside shared on every owner will now has last permuted value.
+```
+or k-permutation into Rc<RefCell<>>
+```Rust
+use permutator::KPermutationCellIter;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+let k = 3;
+let data = &[1, 2, 3, 4, 5];
+let mut result = vec![&data[0]; k];
+let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+
+(data, k, Rc::clone(&shared)).permutation().for_each(|_| {
+    // each permutation will be stored in `shared`
+    println!("{:?}", &*shared.borrow());
+});
 ```
 ## Unsafe way for faster share result
 In some circumstance, the combination result need to be shared but
