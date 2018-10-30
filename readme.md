@@ -683,7 +683,7 @@ inside the buffer. The sender will block until the receiver read the data.
     }).join().unwrap();
 ```
 ## Breaking change from 0.1.6 to 0.2.0
-Version 2.0 has major overhaul on entire crate to make use case more consistent on each other functionalities. There are now only 2 major distinct styles. 1. Callback function 2. Iterator object. The Iterator object has 2 sub-style. 1. Plain `Iterator` style. 2. Shared `Iterator` style. The shared `Iterator` style has both safe and unsafe kind of share which is similar to callback style counterpart. It need to rename every structs. It add one more trait and some more types.
+Version 0.2.0 has major overhaul on entire crate to make use case more consistent on each other functionalities. There are now only 2 major distinct styles. 1. Callback function 2. Iterator object. The Iterator object has 2 sub-style. 1. Plain `Iterator` style. 2. Shared `Iterator` style. The shared `Iterator` style has both safe and unsafe kind of share which is similar to callback style counterpart. It need to rename every structs. It add one more trait and some more types.
 More detail on breaking change:
 - An iterator style `next_into_cell` has been refactored into their own struct. Now it can be used like simple Iterator with slightly different way to return value.
 - A mimic iterator style `next` that took `&mut[&T]` parameter has been refactored into their own struct. Now it can be used like simple Iterator with slightly different way to return value.
