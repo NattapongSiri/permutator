@@ -3684,8 +3684,8 @@ impl<'a, T> Permutation<'a> for KPermutationParams<'a, T> {
     }
 }
 
-/// A pair of parameter that allow `Permutation` trait
-/// to create [k-permutation iterator](struct.KPermutationIterator.html) from it.
+/// A tuples of 3 parameters that allow `Permutation` trait
+/// to create [k-permutation iterator](struct.KPermutationCellIter.html) from it.
 /// 
 /// This type is used exclusively in [trait Permutation](trait.Permutation.html#implementors)
 /// 
@@ -3707,7 +3707,7 @@ impl<'a, 'b : 'a, T> Permutation<'a> for KPermutationIntoCellParams<'b, T> {
     }
 }
 
-/// A pair of parameter that allow `Permutation` trait
+/// A tuple of 3 parameters that allow `Permutation` trait
 /// to create [k-permutation ref iterator](struct.KPermutationRefIterator.html) from it.
 /// 
 /// This type is used exclusively in [trait Permutation](trait.Permutation.html#implementors)
