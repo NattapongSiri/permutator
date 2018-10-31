@@ -709,6 +709,423 @@ pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&
     }
 }
 
+/// Create a cartesian product over itself. The result will be a slice
+/// of borrowed `T`. 
+/// 
+/// # Parameters
+/// - `set` A slice of slice(s) contains `T` elements.
+/// - `n` How many time to create a product over `set`
+/// - `cb` A callback function. It will be called on each product.
+/// 
+/// # Return
+/// A function return a slice of borrowed `T` element out of parameter `sets`.
+/// It return value as parameter of callback function `cb`.
+/// 
+/// # Examples
+/// To print all cartesian product between [1, 2, 3] and [4, 5, 6].
+/// ```
+///    use permutator::cartesian_product;
+/// 
+///    self_cartesian_product(&[1, 2, 3], 3, |product| {
+///        // First called will receive [1, 4] then [1, 5] then [1, 6]
+///        // then [2, 4] then [2, 5] and so on until [3, 6].
+///        println!("{:?}", product);
+///    });
+/// ```
+pub fn self_cartesian_product<T>(set : &[T], n : usize, mut cb : impl FnMut(&[&T])) {
+    let mut result = vec![&set[0]; n];
+    let mut more = true;
+    let n_1 = n - 1;
+    let mut i = 0;
+    let mut c = vec![0; n];
+    while more {
+        result[i] = &set[c[i]];
+
+        if i == n_1 {
+            c[i] += 1;
+            cb(&result);
+        }
+
+        if i < n_1 {
+            i += 1;
+        }
+
+        while c[i] == n {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
+/// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
+/// except the way it return the product.
+/// It return result through mutable pointer to result assuming the
+/// pointer is valid. It'll notify caller on each new result via empty
+/// callback function.
+/// # Parameters
+/// - `set` A raw sets of data to get a cartesian product.
+/// - `n` How many time to create a product on `set` parameter.
+/// - `result` A mutable pointer to slice of length equals to `sets.len()`
+/// - `cb` A callback function  which will be called after new product
+/// in `result` is set.
+/// # Return
+/// This function return result through function's parameter `result` and
+/// notify caller that new result is available through `cb` callback function.
+/// # Unsafe
+/// This function is unsafe because it may dereference a dangling pointer,
+/// may cause data race if multiple threads read/write to the same memory,
+/// and all of those unsafe Rust condition will be applied here.
+/// # Rationale
+/// The safe [self_cartesian_product function](fn.self_cartesian_product.html) 
+/// return value in callback parameter. It limit the lifetime of return 
+/// product to be valid only inside it callback. To use it outside 
+/// callback scope, it need to copy the value which will have performance 
+/// penalty. Therefore, jeopardize it own goal of being fast. This 
+/// function provide alternative way that sacrifice safety for performance.
+/// 
+/// # Example
+/// The scenario is we want to get cartesian product from single source of data
+/// then distribute the product to two workers which read each combination
+/// then do something about it, which in this example, simply print it.
+/// ```
+///    use permutator::unsafe_self_cartesian_product;
+///    use std::fmt::Debug;
+///    // All shared data consumer will get call throught this trait
+///    trait Consumer {
+///        fn consume(&self); // need to be ref due to rule of only ref mut is permit at a time
+///    }
+/// 
+///    struct Worker1<'a, T : 'a> {
+///        data : &'a[&'a T] // Store ref to cartesian product.
+///    }
+/// 
+///    impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+///        fn consume(&self) {
+///            // read new share cartesian product and do something about it, in this case simply print it.
+///            println!("Work1 has {:?}", self.data);
+///        }
+///    }
+///
+///    struct Worker2<'a, T : 'a> {
+///        data : &'a[&'a T] // Store ref to cartesian product.
+///    }
+/// 
+///    impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+///        fn consume(&self) {
+///            // read new share cartesian product and do something about it, in this case simply print it.
+///            println!("Work2 has {:?}", self.data);
+///        }
+///    }
+///
+///    unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [&'a i32], consumers : Vec<Box<Consumer + 'a>>) {
+///        unsafe_self_cartesian_product(data, cur_result, || {
+///            consumers.iter().for_each(|c| {
+///                c.consume();
+///            })
+///        });
+///    }
+/// 
+///    let data : &[i32] = &[1, 2, 3];
+///    let n = 3;
+///    let mut result = vec![&data[0][0]; data.len()];
+///
+///    unsafe {
+///
+///        let shared = result.as_mut_slice() as *mut [&i32];
+///        let worker1 = Worker1 {
+///            data : &result
+///        };
+///        let worker2 = Worker2 {
+///            data : &result
+///        };
+///        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+///        start_cartesian_product_process(data, n, shared, consumers);
+///    }
+/// ```
+/// # See
+/// - [cartesian_product function](fn.cartesian_product.html)
+pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, result : *mut [&'a T], mut cb : impl FnMut()) {
+    let mut more = true;
+    let mut i = 0;
+    let n_1 = n - 1;
+    let mut c = vec![0; n];
+    while more {
+        (*result)[i] = &set[c[i]];
+
+        if i == n_1 {
+            c[i] += 1;
+            cb();
+        }
+
+        if i < n_1 {
+            i += 1;
+        }
+
+        while c[i] == n {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
+/// Similar to safe [cartesian_product function](fn.self_cartesian_product.html) 
+/// except the way it return the product.
+/// It return result through Rc<RefCell<>> to mutable slice of result.
+/// It'll notify caller on each new result via empty callback function.
+/// # Parameters
+/// - `set` A raw sets of data to get a cartesian product.
+/// - `n` How many time to create a product of `set` parameter
+/// - `result` An Rc<RefCell<>> contains mutable slice of length equals to `sets.len()`
+/// - `cb` A callback function  which will be called after new product
+/// in `result` is set.
+/// # Return
+/// This function return result through function's parameter `result` and
+/// notify caller that new result is available through `cb` callback function.
+/// # Rationale
+/// The safe [cartesian product function](fn.cartesian_product.html) return value in
+/// callback parameter. It limit the lifetime of return combination to be
+/// valid only inside it callback. To use it outside callback scope, it
+/// need to copy the value which will have performance penalty. Therefore,
+/// jeopardize it own goal of being fast. This function provide alternative
+/// safe way to share result which is roughly 50% slower to unsafe counterpart.
+/// The performance is on par with using [CartesianProduct](struct.CartesianProductIterator.html#method.next_into_cell)
+/// iterator.
+/// 
+/// # Example
+/// The scenario is we want to get cartesian product from single source of data
+/// then distribute the product to two workers which read each combination
+/// then do something about it, which in this example, simply print it.
+/// ```
+///    use permutator::self_cartesian_product_cell;
+///    use std::fmt::Debug;
+///    use std::rc::Rc;
+///    use std::cell::RefCell;
+/// 
+///    // All shared data consumer will get call throught this trait
+///    trait Consumer {
+///        fn consume(&self); // need to be ref due to rule of only ref mut is permit at a time
+///    }
+/// 
+///    struct Worker1<'a, T : 'a> {
+///        data : Rc<RefCell<&'a mut[&'a T]>> // Store ref to cartesian product.
+///    }
+/// 
+///    impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+///        fn consume(&self) {
+///            // read new share cartesian product and do something about it, in this case simply print it.
+///            println!("Work1 has {:?}", self.data.borrow());
+///        }
+///    }
+///
+///    struct Worker2<'a, T : 'a> {
+///        data : Rc<RefCell<&'a mut[&'a T]>> // Store ref to cartesian product.
+///    }
+/// 
+///    impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+///        fn consume(&self) {
+///            // read new share cartesian product and do something about it, in this case simply print it.
+///            println!("Work2 has {:?}", self.data.borrow());
+///        }
+///    }
+///
+///    fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : Rc<RefCell<&'a mut [&'a i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+///        self_cartesian_product_cell(data, n, cur_result, || {
+///            consumers.iter().for_each(|c| {
+///                c.consume();
+///            })
+///        });
+///    }
+/// 
+///    let data : &[i32] = &[1, 2, 3];
+///    let n = 3;
+///    let mut result = vec![&data[0][0]; data.len()];
+///
+///    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+///    let worker1 = Worker1 {
+///        data : Rc::clone(&shared)
+///    };
+///    let worker2 = Worker2 {
+///        data : Rc::clone(&shared)
+///    };
+///    let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+///    start_cartesian_product_process(data, n, shared, consumers);
+/// ```
+/// # See
+/// - [cartesian_product function](fn.cartesian_product.html)
+pub fn self_cartesian_product_cell<'a, T>(set : &'a[T], n : usize, result : Rc<RefCell<&'a mut [&'a T]>>, mut cb : impl FnMut()) {
+    let mut more = true;
+    let mut i = 0;
+    let n_1 = n - 1;
+    let mut c = vec![0; n];
+    while more {
+        result.borrow_mut()[i] = &set[c[i]];
+
+        if i == n_1 {
+            c[i] += 1;
+            cb();
+        }
+
+        if i < n_1 {
+            i += 1;
+        }
+
+        while c[i] == n {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
+/// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
+/// except the way it return the product.
+/// It return result through Arc<RwLock<>> to mutable slice of result.
+/// It'll notify caller on each new result via empty callback function.
+/// # Parameters
+/// - `set` A raw set of data to get a cartesian product.
+/// - `n` how many times to do the product of `set` parameter
+/// - `result` An Arc<RwLock<>> contains mutable slice of length equals to parameter `n`
+/// - `cb` A callback function  which will be called after new product
+/// in `result` is set.
+/// # Return
+/// This function return result through function's parameter `result` and
+/// notify caller that new result is available through `cb` callback function.
+/// # Rationale
+/// The safe [cartesian product function](fn.self_cartesian_product.html) return value in
+/// callback parameter. It limit the lifetime of return combination to be
+/// valid only inside it callback. To use it outside callback scope, it
+/// need to copy the value which will have performance penalty. Therefore,
+/// jeopardize it own goal of being fast. This function provide alternative
+/// safe way to share result which is roughly 50% slower to unsafe counterpart.
+/// The performance is on roughly 15%-20% slower than [SelfCartesianProduct](struct.SelfCartesianProductIterator.html)
+/// iterator in uncontrol test environment.
+/// 
+/// # Example
+/// The scenario is we want to get cartesian product from single source of data
+/// then distribute the product to two workers which read each combination
+/// then do something about it, which in this example, simply print it.
+/// ```
+///    use std::thread;
+///    use std::sync::{Arc, RwLock};
+///    use std::sync::mpsc;
+///    use std::sync::mpsc::{Receiver, SyncSender};
+///    use permutator::self_cartesian_product_sync;
+///  
+///    fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : Arc<RwLock<Vec<&'a i32>>>, notifier : Vec<SyncSender<Option<()>>>, release_recv : Receiver<()>) {
+///        use std::time::Instant;
+///        let timer = Instant::now();
+///        let mut counter = 0;
+///        self_cartesian_product_sync(data, n, cur_result, || {
+///            notifier.iter().for_each(|n| {
+///                n.send(Some(())).unwrap(); // notify every thread that new data available
+///            });
+///
+///            for _ in 0..notifier.len() {
+///                release_recv.recv().unwrap(); // block until all thread reading data notify on read completion
+///            }
+///
+///            counter += 1;
+///        });
+///
+///        notifier.iter().for_each(|n| {n.send(None).unwrap()}); // notify every thread that there'll be no more data.
+///
+///        println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
+///    }
+/// 
+///    let data : &[i32]= &[1, 2, 3];
+///    let n = 3;
+///    let result = vec![&data[0]; n];
+///    let result_sync = Arc::new(RwLock::new(result));
+///
+///    // workter thread 1
+///    let (t1_send, t1_recv) = mpsc::sync_channel::<Option<()>>(0);
+///    let (main_send, main_recv) = mpsc::sync_channel(0);
+///    let t1_local = main_send.clone();
+///    let t1_dat = Arc::clone(&result_sync);
+///    thread::spawn(move || {
+///        while let Some(_) = t1_recv.recv().unwrap() {
+///            let result : &Vec<&i32> = &*t1_dat.read().unwrap();
+///            // println!("Thread1: {:?}", result);
+///            t1_local.send(()).unwrap(); // notify generator thread that reference is no longer need.
+///        }
+///        println!("Thread1 is done");
+///    });
+/// 
+///    // worker thread 2
+///    let (t2_send, t2_recv) = mpsc::sync_channel::<Option<()>>(0);
+///    let t2_dat = Arc::clone(&result_sync);
+///    let t2_local = main_send.clone();
+///    thread::spawn(move || {
+///        while let Some(_) = t2_recv.recv().unwrap() {
+///            let result : &Vec<&i32> = &*t2_dat.read().unwrap();
+///            // println!("Thread2: {:?}", result);
+///            t2_local.send(()).unwrap(); // notify generator thread that reference is no longer need.
+///        }
+///        println!("Thread2 is done");
+///    });
+///
+///    // main thread that generate result
+///    thread::spawn(move || {
+///        start_cartesian_product_process(data, n, result_sync, vec![t1_send, t2_send], main_recv);
+///    }).join().unwrap();
+/// ```
+/// # See
+/// - [cartesian_product function](fn.cartesian_product.html)
+pub fn self_cartesian_product_sync<'a, T>(set : &'a[T], n : usize, result : Arc<RwLock<Vec<&'a T>>>, mut cb : impl FnMut()) {
+    let mut more = true;
+    let mut i = 0;
+    let n_1 = n - 1;
+    let mut c = vec![0; n];
+    while more {
+        result.write().unwrap()[i] = &set[c[i]];
+
+        if i == n_1 {
+            c[i] += 1;
+            cb();
+        }
+
+        if i < n_1 {
+            i += 1;
+        }
+
+        while c[i] == n {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
 /// Generate a combination out of given `domain`.
 /// It call `cb` to several times to return each combination.
 /// It's similar to [struct GosperCombination](struct.GosperCombinationIterator.html) but
@@ -5133,6 +5550,24 @@ pub mod test {
         println!("Total {} product done in {:?}", counter, timer.elapsed());
     }
 
+    #[allow(unused)]
+    #[test]
+    fn test_self_cartesian_product() {
+        use std::time::Instant;
+        let data : &[i32] = &[1, 2, 3];
+        let n = 3;
+
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        self_cartesian_product(&data, 3, |product| {
+            println!("{:?}", product);
+            counter += 1;
+        });
+
+        println!("Total {} product done in {:?}", counter, timer.elapsed());
+    }
+
     #[test]
     fn test_combination_trait() {
         let data = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -5668,6 +6103,56 @@ pub mod test {
     }
 
     #[test]
+    fn test_unsafe_self_cartesian_product_shared_result() {
+        use std::fmt::Debug;
+
+        trait Consumer {
+            fn consume(&self);
+        }
+        struct Worker1<'a, T : 'a> {
+            data : &'a[&'a T]
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+            fn consume(&self) {
+                println!("Work1 has {:?}", self.data);
+            }
+        }
+        struct Worker2<'a, T : 'a> {
+            data : &'a[&'a T]
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+            fn consume(&self) {
+                println!("Work2 has {:?}", self.data);
+            }
+        }
+
+        unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [&'a i32], consumers : Vec<Box<Consumer + 'a>>) {
+            unsafe_self_cartesian_product(data, n, cur_result, || {
+                consumers.iter().for_each(|c| {
+                    c.consume();
+                })
+            });
+        }
+
+        let data : &[i32] = &[1, 2, 3];
+        let n = 3;
+        let mut result = vec![&data[0]; n];
+
+        unsafe {
+
+            let shared = result.as_mut_slice() as *mut [&i32];
+            let worker1 = Worker1 {
+                data : &result
+            };
+            let worker2 = Worker2 {
+                data : &result
+            };
+            let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+            start_cartesian_product_process(data, n, shared, consumers);
+        }
+    }
+
+    #[test]
     fn test_cartesian_product_shared_result_fn() {
         use std::fmt::Debug;
 
@@ -5711,6 +6196,53 @@ pub mod test {
         };
         let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_cartesian_product_process(data, shared, consumers);
+    }
+    
+    #[test]
+    fn test_self_cartesian_product_shared_result_fn() {
+        use std::fmt::Debug;
+
+        trait Consumer {
+            fn consume(&self);
+        }
+        struct Worker1<'a, T : 'a> {
+            data : Rc<RefCell<&'a mut[&'a T]>>
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
+            fn consume(&self) {
+                println!("Work1 has {:?}", self.data);
+            }
+        }
+        struct Worker2<'a, T : 'a> {
+            data : Rc<RefCell<&'a mut[&'a T]>>
+        }
+        impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
+            fn consume(&self) {
+                println!("Work2 has {:?}", self.data);
+            }
+        }
+
+        fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : Rc<RefCell<&'a mut [&'a i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+            self_cartesian_product_cell(data, n, cur_result, || {
+                consumers.iter().for_each(|c| {
+                    c.consume();
+                })
+            });
+        }
+
+        let data : &[i32] = &[1, 2, 3];
+        let n = 3;
+        let mut result = vec![&data[0]; n];
+
+        let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+        let worker1 = Worker1 {
+            data : Rc::clone(&shared)
+        };
+        let worker2 = Worker2 {
+            data : Rc::clone(&shared)
+        };
+        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        start_cartesian_product_process(data, n, shared, consumers);
     
     }
 
