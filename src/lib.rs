@@ -3292,6 +3292,410 @@ impl<'a, T> ExactSizeIterator for KPermutationRefIter<'a, T> {
     }
 }
 
+/// Generate a cartesian product on itself in an iterator style.
+/// The struct implement `Iterator` trait so it can be used in `Iterator` 
+/// style. The struct provide [into_iter()](#method.into_iter()) function 
+/// that return itself.
+/// 
+/// # Example
+/// ```
+///    use permutator::SelfCartesianProductIterator;
+///    use std::time::Instant;
+///    let data : &[usize] = &[1, 2, 3];
+///    let n = 3;
+///    let cart = SelfCartesianProductIterator::new(&data, n);
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///
+///    for p in cart {
+///        // println!("{:?}", p);
+///        counter += 1;
+///    }
+/// 
+///    // or functional style like the line below
+///    // cart.into_iter().for_each(|p| {/* do something iterative style */});
+///
+///    assert_eq!(data.len().pow(n as u32), counter);
+///    println!("Total {} products done in {:?}", counter, timer.elapsed());
+/// ```
+pub struct SelfCartesianProductIterator<'a, T> where T : 'a {
+    c : Vec<usize>,
+    domain : &'a [T],
+    exhausted : bool,
+    i : usize,
+    n : usize,
+
+    result : Vec<&'a T>
+}
+
+impl<'a, T> SelfCartesianProductIterator<'a, T> where T : 'a {
+    /// Create a new Cartesian product iterator that create a product on
+    /// itself `n` times.
+    /// # Parameters
+    /// - `domain` A slice of domains to create a cartesian product between
+    /// each domain inside it.
+    /// - `n` the size of product. For example `n = 3` means create
+    /// a cartesian product over `domain` paremeter 3 times.
+    /// This is equals to create a `domains` contains
+    /// cloned `domain` 3 time.
+    /// # Return
+    /// An object that can be iterate over in iterator style.
+    pub fn new(domain : &'a[T], n : usize) -> SelfCartesianProductIterator<'a, T> {
+
+        SelfCartesianProductIterator {
+            c : vec![0; domain.len()],
+            domain : domain,
+            exhausted : false,
+            i : 0,
+            n : n,
+
+            result : vec![&domain[0]; n]
+        }
+    }
+
+    /// Consume itself and return without modify it.
+    /// Typical usecase is `for p in ref_to_this.into_iter() {}`
+    /// or `ref_to_this.into_iter().for_each(|p| {/* Do something with product */});`
+    pub fn into_iter(self) -> Self {
+        self
+    }
+}
+
+impl<'a, T> Iterator for SelfCartesianProductIterator<'a, T> {
+    type Item = Vec<&'a T>;
+
+    /// Each iteration return a new Vec contains borrowed element inside
+    /// an Option. The result can be collected by using `collect` method
+    /// from `Iterator` trait.
+    /// 
+    /// Return None when exhausted.
+    fn next(&mut self) -> Option<Vec<&'a T>> {
+        // move and set `result` and `c` up until all `domains` processed
+        while self.i < self.n && !self.exhausted {
+            // if current domain is exhausted.
+            if self.c[self.i] == self.n {
+                // reset all exhausted domain in `result` and `c`
+                let mut k = self.i;
+
+                // reset all exhausted until either found non-exhausted or reach first domain
+                while self.c[k] == self.n && k > 0 {
+                    self.c[k] = 1;
+                    self.result[k] = &self.domain[0];
+                    k -= 1;
+                }
+
+                if k == 0 && self.c[k] == self.n {
+                    // if first domain is also exhausted then flag it.
+                    self.exhausted = true;
+                } else {
+                    // otherwise advance c[k] and set result[k] to next value
+                    self.result[k] = &self.domain[self.c[k]];
+                    self.c[k] += 1;
+                }
+            } else {
+                // non exhausted domain, advance `c` and set result
+                self.result[self.i] = &self.domain[self.c[self.i]];
+                self.c[self.i] += 1;
+            }
+            self.i += 1;
+        }
+
+        if self.exhausted {
+            None
+        } else {
+            self.i -= 1; // rewind `i` back to last domain
+            Some(self.result.to_owned())
+        }
+    }
+}
+
+impl<'a, T> IteratorReset for SelfCartesianProductIterator<'a, T> {
+    fn reset(&mut self) {
+        self.c = vec![0; self.n];
+        self.exhausted = false;
+        self.i = 0;
+    }
+}
+
+impl<'a, T> ExactSizeIterator for SelfCartesianProductIterator<'a, T> {
+    fn len(&self) -> usize {
+        self.n
+    }
+}
+
+/// Generate a cartesian product on itself in an iterator style.
+/// The struct implement `Iterator` trait so it can be used in `Iterator` 
+/// style. The struct provide [into_iter()](#method.into_iter()) function 
+/// that return itself.
+/// 
+/// # Example
+/// ```
+///    use permutator::SelfCartesianProductCellIter;
+///    use std::cell::RefCell;
+///    use std::rc::Rc;
+///    use std::time::Instant;
+///    let data : &[usize] = &[1, 2, 3];
+///    let n = 3;
+///    let result : &mut[&usize] = &mut vec![&data[0]; n];
+///    let shared = Rc::new(RefCell::new(result));
+///    let cart = SelfCartesianProductCellIter::new(&data, n, Rc::clone(&shared));
+///    let mut counter = 0;
+///    let timer = Instant::now();
+///
+///    for _ in cart {
+///        // println!("{:?}", &*shared.borrow());
+///        counter += 1;
+///    }
+/// 
+///    // or functional style like the line below
+///    // cart.into_iter().for_each(|_| {/* do something iterative style */});
+///
+///    assert_eq!(data.len().pow(n as u32), counter);
+///    println!("Total {} products done in {:?}", counter, timer.elapsed());
+/// ```
+pub struct SelfCartesianProductCellIter<'a, T> where T : 'a {
+    c : Vec<usize>,
+    domain : &'a [T],
+    exhausted : bool,
+    i : usize,
+    n : usize,
+
+    result : Rc<RefCell<&'a mut [&'a T]>>
+}
+
+impl<'a, T> SelfCartesianProductCellIter<'a, T> where T : 'a {
+    /// Create a new Cartesian product iterator that create a product on
+    /// itself `n` times.
+    /// # Parameters
+    /// - `domain` A slice of domains to create a cartesian product between
+    /// each domain inside it.
+    /// This is equals to create a `domains` contains
+    /// cloned `domain` 3 time.
+    /// - `n` the size of product. For example `n = 3` means create
+    /// a cartesian product over `domain` paremeter 3 times.
+    /// - `result` an Rc<RefCell<&mut[&T]>> to store each product
+    /// # Return
+    /// An object that can be iterate over in iterator style.
+    pub fn new(domain : &'a[T], n : usize, result : Rc<RefCell<&'a mut [&'a T]>>) -> SelfCartesianProductCellIter<'a, T> {
+
+        SelfCartesianProductCellIter {
+            c : vec![0; domain.len()],
+            domain : domain,
+            exhausted : false,
+            i : 0,
+            n : n,
+
+            result : Rc::clone(&result)
+        }
+    }
+
+    /// Consume itself and return without modify it.
+    /// Typical usecase is `for p in ref_to_this.into_iter() {}`
+    /// or `ref_to_this.into_iter().for_each(|p| {/* Do something with product */});`
+    pub fn into_iter(self) -> Self {
+        self
+    }
+}
+
+impl<'a, T> Iterator for SelfCartesianProductCellIter<'a, T> {
+    type Item = ();
+
+    /// Each iteration return a new Vec contains borrowed element inside
+    /// an Option. The result can be collected by using `collect` method
+    /// from `Iterator` trait.
+    /// 
+    /// Return None when exhausted.
+    fn next(&mut self) -> Option<()> {
+        // move and set `result` and `c` up until all `domains` processed
+        while self.i < self.n && !self.exhausted {
+            // if current domain is exhausted.
+            if self.c[self.i] == self.n {
+                // reset all exhausted domain in `result` and `c`
+                let mut k = self.i;
+
+                // reset all exhausted until either found non-exhausted or reach first domain
+                while self.c[k] == self.n && k > 0 {
+                    self.c[k] = 1;
+                    self.result.borrow_mut()[k] = &self.domain[0];
+                    k -= 1;
+                }
+
+                if k == 0 && self.c[k] == self.n {
+                    // if first domain is also exhausted then flag it.
+                    self.exhausted = true;
+                } else {
+                    // otherwise advance c[k] and set result[k] to next value
+                    self.result.borrow_mut()[k] = &self.domain[self.c[k]];
+                    self.c[k] += 1;
+                }
+            } else {
+                // non exhausted domain, advance `c` and set result
+                self.result.borrow_mut()[self.i] = &self.domain[self.c[self.i]];
+                self.c[self.i] += 1;
+            }
+            self.i += 1;
+        }
+
+        if self.exhausted {
+            None
+        } else {
+            self.i -= 1; // rewind `i` back to last domain
+            Some(())
+        }
+    }
+}
+
+impl<'a, T> IteratorReset for SelfCartesianProductCellIter<'a, T> {
+    fn reset(&mut self) {
+        self.c = vec![0; self.n];
+        self.exhausted = false;
+        self.i = 0;
+    }
+}
+
+impl<'a, T> ExactSizeIterator for SelfCartesianProductCellIter<'a, T> {
+    fn len(&self) -> usize {
+        self.n
+    }
+}
+
+/// Generate a cartesian product on itself in an iterator style.
+/// The struct implement `Iterator` trait so it can be used in `Iterator` 
+/// style. The struct provide [into_iter()](#method.into_iter()) function 
+/// that return itself.
+/// 
+/// # Example
+/// ```
+///    use permutator::SelfCartesianProductRefIter;
+///    use std::time::Instant;
+///    let data : &[usize] = &[1, 2, 3];
+///    let n = 3;
+///    let result : &mut[&usize] = &mut vec![&data[0]; n];
+///    let shared = result as *mut[&usize];
+///    
+///    unsafe {
+///         let cart = SelfCartesianProductRefIter::new(&data, n, result);
+///         let mut counter = 0;
+///         let timer = Instant::now();
+///
+///         for _ in cart {
+///             // println!("{:?}", &*shared);
+///             counter += 1;
+///         }
+/// 
+///         // or functional style like the line below
+///         // cart.into_iter().for_each(|_| {/* do something iterative style */});
+///
+///         assert_eq!(data.len().pow(n as u32), counter);
+///         println!("Total {} products done in {:?}", counter, timer.elapsed());
+///    }
+/// ```
+pub struct SelfCartesianProductRefIter<'a, T> where T : 'a {
+    c : Vec<usize>,
+    domain : &'a [T],
+    exhausted : bool,
+    i : usize,
+    n : usize,
+
+    result : &'a mut [&'a T]
+}
+
+impl<'a, T> SelfCartesianProductRefIter<'a, T> where T : 'a {
+    /// Create a new Cartesian product iterator that create a product on
+    /// itself `n` times.
+    /// # Parameters
+    /// - `domain` A slice of domains to create a cartesian product between
+    /// each domain inside it.
+    /// This is equals to create a `domains` contains
+    /// cloned `domain` 3 time.
+    /// - `n` the size of product. For example `n = 3` means create
+    /// a cartesian product over `domain` paremeter 3 times.
+    /// - `result` *mut[&T] to store each product
+    /// # Return
+    /// An object that can be iterate over in iterator style.
+    pub unsafe fn new(domain : &'a[T], n : usize, result : * mut [&'a T]) -> SelfCartesianProductRefIter<'a, T> {
+
+        SelfCartesianProductRefIter {
+            c : vec![0; domain.len()],
+            domain : domain,
+            exhausted : false,
+            i : 0,
+            n : n,
+
+            result : &mut *result
+        }
+    }
+
+    /// Consume itself and return without modify it.
+    /// Typical usecase is `for p in ref_to_this.into_iter() {}`
+    /// or `ref_to_this.into_iter().for_each(|p| {/* Do something with product */});`
+    pub fn into_iter(self) -> Self {
+        self
+    }
+}
+
+impl<'a, T> Iterator for SelfCartesianProductRefIter<'a, T> {
+    type Item = ();
+
+    /// Each iteration return a new Vec contains borrowed element inside
+    /// an Option. The result can be collected by using `collect` method
+    /// from `Iterator` trait.
+    /// 
+    /// Return None when exhausted.
+    fn next(&mut self) -> Option<()> {
+        // move and set `result` and `c` up until all `domains` processed
+        while self.i < self.n && !self.exhausted {
+            // if current domain is exhausted.
+            if self.c[self.i] == self.n {
+                // reset all exhausted domain in `result` and `c`
+                let mut k = self.i;
+
+                // reset all exhausted until either found non-exhausted or reach first domain
+                while self.c[k] == self.n && k > 0 {
+                    self.c[k] = 1;
+                    self.result[k] = &self.domain[0];
+                    k -= 1;
+                }
+
+                if k == 0 && self.c[k] == self.n {
+                    // if first domain is also exhausted then flag it.
+                    self.exhausted = true;
+                } else {
+                    // otherwise advance c[k] and set result[k] to next value
+                    self.result[k] = &self.domain[self.c[k]];
+                    self.c[k] += 1;
+                }
+            } else {
+                // non exhausted domain, advance `c` and set result
+                self.result[self.i] = &self.domain[self.c[self.i]];
+                self.c[self.i] += 1;
+            }
+            self.i += 1;
+        }
+
+        if self.exhausted {
+            None
+        } else {
+            self.i -= 1; // rewind `i` back to last domain
+            Some(())
+        }
+    }
+}
+
+impl<'a, T> IteratorReset for SelfCartesianProductRefIter<'a, T> {
+    fn reset(&mut self) {
+        self.c = vec![0; self.n];
+        self.exhausted = false;
+        self.i = 0;
+    }
+}
+
+impl<'a, T> ExactSizeIterator for SelfCartesianProductRefIter<'a, T> {
+    fn len(&self) -> usize {
+        self.n
+    }
+}
+
 /// Create a cartesian product out of `T`.
 /// For example,
 /// - `T` can be a slice of slices so the product can
@@ -4162,6 +4566,25 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
+    fn test_SelfCartesianProduct() {
+        use std::time::Instant;
+        let data : &[usize] = &[1, 2, 3];
+        let n = 3;
+        let cart = SelfCartesianProductIterator::new(&data, n);
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        for p in cart {
+            println!("{:?}", p);
+            counter += 1;
+        }
+
+        assert_eq!(data.len().pow(n as u32), counter);
+        println!("Total {} products done in {:?}", counter, timer.elapsed());
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
     fn test_CartesianProduct_reset() {
         use std::time::Instant;
         let data : &[&[usize]] = &[&[1, 2, 3], &[4, 5, 6], &[7, 8, 9]];
@@ -4220,6 +4643,51 @@ pub mod test {
             println!("Total {} products done in {:?}", counter, timer.elapsed());
         }
     }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_SelfCartesianProduct_cell() {
+        use std::time::Instant;
+        let data : &[usize] = &[1, 2, 3];
+        let n = 3;
+        let mut result = vec![&data[0]; n];
+        let shared = Rc::new(RefCell::new(result.as_mut_slice()));
+        let cart = SelfCartesianProductCellIter::new(&data, n, Rc::clone(&shared));
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        for _ in cart {
+            println!("{:?}", &*shared.borrow());
+            counter += 1;
+        }
+
+        assert_eq!(data.len().pow(n as u32), counter);
+        println!("Total {} products done in {:?}", counter, timer.elapsed());
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_SelfCartesianProduct_ref() {
+        use std::time::Instant;
+        let data : &[usize] = &[1, 2, 3];
+        let n = 3;
+        let result : &mut[&usize] = &mut vec![&data[0]; n];
+        let shared = result as *mut[&usize];
+        unsafe {
+            let cart = SelfCartesianProductRefIter::new(&data, n, result);
+            let mut counter = 0;
+            let timer = Instant::now();
+
+            for _ in cart {
+                println!("{:?}", &*shared);
+                counter += 1;
+            }
+
+            assert_eq!(data.len().pow(n as u32), counter);
+            println!("Total {} products done in {:?}", counter, timer.elapsed());
+        }
+    }
+
     #[allow(non_snake_case, unused)]
     #[test]
     fn test_CartesianProduct_mimic_iterator_2() {
