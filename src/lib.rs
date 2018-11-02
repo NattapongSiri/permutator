@@ -3682,6 +3682,7 @@ impl<'a, T> ExactSizeIterator for HeapPermutationRefIter<'a, T> {
     }
 }
 
+#[inline(always)]
 unsafe fn _k_permutation_next_core<'a, T, U, V, W>(
     combinator : T,
     permutator : * mut Option<U>, 
@@ -3913,6 +3914,7 @@ impl<'a, T> Iterator for KPermutationIterator<'a, T> {
                 combinator, 
                 permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>, 
                 permuted, 
+                #[inline(always)]
                 |comb| {
                     HeapPermutationIterator::new((*comb).as_mut_slice())
                 }
@@ -4099,6 +4101,7 @@ impl<'a, T> Iterator for KPermutationCellIter<'a, T> {
                 &mut self.combinator, 
                 permutator,
                 permuted, 
+                #[inline(always)]
                 |comb| {
                     HeapPermutationCellIter::new(comb)
                 }) {
@@ -4289,6 +4292,7 @@ impl<'a, T> Iterator for KPermutationRefIter<'a, T> {
                 &mut self.combinator, 
                 permutator,
                 self.permuted as *mut [&T], 
+                #[inline(always)]
                 |comb| {
                     HeapPermutationIterator::new(&mut *comb)
                 }) {
@@ -4427,9 +4431,11 @@ impl<'a, T> Iterator for SelfCartesianProductIterator<'a, T> {
             &mut self.c, 
             &mut self.exhausted,
             self.n,
+            #[inline(always)]
             |_| {
                 domain.len()
             },
+            #[inline(always)]
             |i, j| {
                 result[i] = &domain[j];
             }
@@ -4577,9 +4583,11 @@ impl<'a, T> Iterator for SelfCartesianProductCellIter<'a, T> {
             &mut self.c, 
             &mut self.exhausted,
             self.n,
+            #[inline(always)]
             |_| {
                 domain.len()
             },
+            #[inline(always)]
             |i, j| {
                 result[i] = &domain[j];
             }
@@ -4728,9 +4736,11 @@ impl<'a, T> Iterator for SelfCartesianProductRefIter<'a, T> {
             &mut self.c, 
             &mut self.exhausted,
             self.n,
+            #[inline(always)]
             |_| {
                 domain.len()
             },
+            #[inline(always)]
             |i, j| {
                 result[i] = &domain[j];
             }
