@@ -31,6 +31,30 @@ It provides 2 functions to get a cartesian product or k-permutation:
 It also provide utilities functions like:
 - get_cartesian_size
 - get_permutation_size
+## Get a cartesian product over a set itself multiple times
+There are two distinct implementation to get cartesian product.
+- Iterator that return product
+- Function that call callback function to return product
+### Iterator 
+This crate provides `SelfCartesianProductIterator`, `SelfCartesianProductCellIter`, and `SelfCartesianProductRefIter` structs that implement
+`Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
+- `SelfCartesianProductIterator` can be used in any case that performance is least concern.
+- `SelfCartesianProductCellIter` can be used in case performance is important as well as safety.
+- `SelfCartesianProductRefIter` can be used in case performance is critical and safety will be handle by caller.
+Every structs implements `IteratorReset` trait.
+- use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
+### Trait
+This crate provides `CartesianProduct` trait which add function `cart_prod` that return an Iterator to generate a `Cartesian Product` over a set itself multiple times. The types that currently support are:
+- (&'a [T], usize) - Generate cartesian product over 'first paramter' for 'second paramater' times.
+- (&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>) - Similar to above but keep overwrite the product into 'third parameter'
+- (&'a [T], usize, *mut [&'a T]) - Similar to above but use unsafe pointer to store value.
+Each type above return different Iterator. For example (&'a [T], usize) return `SelfCartesianProductIterator` but on (&'a [T], usize, *mut [&'a T]) return `SelfCartesianProductRefIter`.
+### Callback function
+This crate provides 4 functions that serve different usecase.
+- `self_cartesian_product` function that return product as callback parameter
+- `self_cartesian_product_cell` function that return product into Rc<RefCell<>> given in function parameter
+- `self_cartesian_product_sync` function that return product into Arc<RwLock<>> given in function parameter
+- `unsafe_self_cartesian_product` unsafe function that return product into mutable pointer given in function parameter
 ## Get a cartesian product over multiple sets
 There are two distinct implementation to get cartesian product.
 - Iterator that return product

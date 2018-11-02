@@ -107,7 +107,7 @@ extern crate num;
 use num::{PrimInt, Unsigned};
 use std::cell::RefCell;
 use std::collections::{VecDeque};
-use std::iter::{ExactSizeIterator, Product};
+use std::iter::{ExactSizeIterator, Product, Iterator};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
@@ -299,6 +299,59 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
     Ok(result)
 }
 
+/// Core algorithm to generate cartesian product.
+/// # Parameters
+/// - `n` - the size of domains.
+/// For product on self, it equals to how many time to create product on self.
+/// - `set_len` - the closure to get length of each domain.
+/// - `assign_res` - the closure to store product into result
+/// - `cb` - the closure to get call on each generated product.
+/// # Execution sequence of closure.
+/// Each step in sequence is performed sequentially. 
+/// It won't advance if the closure in given step isn't return.
+/// 1. `assign_res` once
+/// 2. `cb` once
+/// 3. `set_len` multiple times until it found at least a domain
+/// that doesn't exhausted, otherwise, terminate function.
+/// 4. go back to step 1 
+#[inline(always)]
+fn _cartesian_product_core(
+    n : usize, 
+    set_len : impl Fn(usize) -> usize, 
+    mut assign_res : impl FnMut(usize, usize), 
+    mut cb : impl FnMut() )
+{
+    let mut more = true;
+    let mut i = 0;
+    let mut c = vec![0; n];
+    let n = n - 1;
+    while more {
+        assign_res(i, c[i]);
+
+        if i == n {
+            c[i] += 1;
+            cb();
+        }
+
+        if i < n {
+            i += 1;
+        }
+
+        while c[i] == set_len(i) {
+            c[i] = 0;
+            
+            if i == 0 {
+                more = false;
+                break;
+            }
+
+            i -= 1;
+            c[i] += 1;
+        }
+
+    }
+}
+
 /// Create a cartesian product over given slice. The result will be a slice
 /// of borrowed `T`. 
 /// 
@@ -321,37 +374,58 @@ pub fn get_permutation_for<T>(objects: &[T], degree: usize, x: usize) -> Result<
 ///        println!("{:?}", product);
 ///    });
 /// ```
-pub fn cartesian_product<T>(sets : &[&[T]], mut cb : impl FnMut(&[&T])) {
+pub fn cartesian_product<'a, T>(
+    sets : &'a [&[T]], 
+    mut cb : impl FnMut(&'a [&T]))
+{
     let mut result = vec![&sets[0][0]; sets.len()];
-    let mut more = true;
-    let n = sets.len() - 1;
-    let mut i = 0;
-    let mut c = vec![0; sets.len()];
-    while more {
-        result[i] = &sets[i][c[i]];
-
-        if i == n {
-            c[i] += 1;
-            cb(&result);
-        }
-
-        if i < n {
-            i += 1;
-        }
-
-        while c[i] == sets[i].len() {
-            c[i] = 0;
-            
-            if i == 0 {
-                more = false;
-                break;
-            }
-
-            i -= 1;
-            c[i] += 1;
-        }
-
+    let copied = result.as_slice() as *const [&T];
+    unsafe {
+        // It'd safe to use pointer here because internally,
+        // the callback will be called after result mutation closure
+        // and it will wait until the callback function return to 
+        // resume mutate the result again.
+        _cartesian_product_core(
+            sets.len(), 
+            #[inline(always)] |i| {
+                sets[i].len()
+            }, 
+            #[inline(always)] |i, c| {
+                result[i] = &sets[i][c];
+            }, 
+            #[inline(always)] || {
+                cb(&*copied);
+            });
     }
+    // let mut more = true;
+    // let n = sets.len() - 1;
+    // let mut i = 0;
+    // let mut c = vec![0; sets.len()];
+    // while more {
+    //     result[i] = &sets[i][c[i]];
+
+    //     if i == n {
+    //         c[i] += 1;
+    //         cb(&result);
+    //     }
+
+    //     if i < n {
+    //         i += 1;
+    //     }
+
+    //     while c[i] == sets[i].len() {
+    //         c[i] = 0;
+            
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
+
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
+
+    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -439,36 +513,44 @@ pub fn cartesian_product<T>(sets : &[&[T]], mut cb : impl FnMut(&[&T])) {
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub unsafe fn unsafe_cartesian_product<'a, T>(sets : &'a[&[T]], result : *mut [&'a T], mut cb : impl FnMut()) {
-    let mut more = true;
-    let n = sets.len() - 1;
-    let mut i = 0;
-    let mut c = vec![0; sets.len()];
-    while more {
-        (*result)[i] = &sets[i][c[i]];
+pub unsafe fn unsafe_cartesian_product<'a, T>(sets : &'a[&[T]], result : *mut [&'a T], cb : impl FnMut()) {
+    _cartesian_product_core(
+        sets.len(), 
+        #[inline(always)] |i| {
+            sets[i].len()
+        }, 
+        #[inline(always)] |i, c| {
+            (*result)[i] = &sets[i][c];
+        }, cb);
+    // let mut more = true;
+    // let n = sets.len() - 1;
+    // let mut i = 0;
+    // let mut c = vec![0; sets.len()];
+    // while more {
+    //     (*result)[i] = &sets[i][c[i]];
 
-        if i == n {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n {
-            i += 1;
-        }
+    //     if i < n {
+    //         i += 1;
+    //     }
 
-        while c[i] == sets[i].len() {
-            c[i] = 0;
+    //     while c[i] == sets[i].len() {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -553,36 +635,44 @@ pub unsafe fn unsafe_cartesian_product<'a, T>(sets : &'a[&[T]], result : *mut [&
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub fn cartesian_product_cell<'a, T>(sets : &'a[&[T]], result : Rc<RefCell<&'a mut [&'a T]>>, mut cb : impl FnMut()) {
-    let mut more = true;
-    let n = sets.len() - 1;
-    let mut i = 0;
-    let mut c = vec![0; sets.len()];
-    while more {
-        result.borrow_mut()[i] = &sets[i][c[i]];
+pub fn cartesian_product_cell<'a, T>(sets : &'a[&[T]], result : Rc<RefCell<&'a mut [&'a T]>>, cb : impl FnMut()) {
+    _cartesian_product_core(
+        sets.len(), 
+        #[inline(always)] |i| {
+            sets[i].len()
+        }, 
+        #[inline(always)] |i, c| {
+            result.borrow_mut()[i] = &sets[i][c];
+        }, cb);
+    // let mut more = true;
+    // let n = sets.len() - 1;
+    // let mut i = 0;
+    // let mut c = vec![0; sets.len()];
+    // while more {
+    //     result.borrow_mut()[i] = &sets[i][c[i]];
 
-        if i == n {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n {
-            i += 1;
-        }
+    //     if i < n {
+    //         i += 1;
+    //     }
 
-        while c[i] == sets[i].len() {
-            c[i] = 0;
+    //     while c[i] == sets[i].len() {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -677,36 +767,45 @@ pub fn cartesian_product_cell<'a, T>(sets : &'a[&[T]], result : Rc<RefCell<&'a m
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&'a T>>>, mut cb : impl FnMut()) {
-    let mut more = true;
-    let n = sets.len() - 1;
-    let mut i = 0;
-    let mut c = vec![0; sets.len()];
-    while more {
-        result.write().unwrap()[i] = &sets[i][c[i]];
+pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&'a T>>>, cb : impl FnMut()) {
+    _cartesian_product_core(
+        sets.len(), 
+        #[inline(always)] |i| {
+            sets[i].len()
+        }, 
+        #[inline(always)] |i, c| {
+            result.write().unwrap()[i] = &sets[i][c];
+        }, cb);
+    
+    // let mut more = true;
+    // let n = sets.len() - 1;
+    // let mut i = 0;
+    // let mut c = vec![0; sets.len()];
+    // while more {
+    //     result.write().unwrap()[i] = &sets[i][c[i]];
 
-        if i == n {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n {
-            i += 1;
-        }
+    //     if i < n {
+    //         i += 1;
+    //     }
 
-        while c[i] == sets[i].len() {
-            c[i] = 0;
+    //     while c[i] == sets[i].len() {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Create a cartesian product over itself. The result will be a slice
@@ -724,7 +823,7 @@ pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&
 /// # Examples
 /// To print all cartesian product between [1, 2, 3] and [4, 5, 6].
 /// ```
-///    use permutator::cartesian_product;
+///    use permutator::self_cartesian_product;
 /// 
 ///    self_cartesian_product(&[1, 2, 3], 3, |product| {
 ///        // First called will receive [1, 4] then [1, 5] then [1, 6]
@@ -734,35 +833,56 @@ pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&
 /// ```
 pub fn self_cartesian_product<T>(set : &[T], n : usize, mut cb : impl FnMut(&[&T])) {
     let mut result = vec![&set[0]; n];
-    let mut more = true;
-    let n_1 = n - 1;
-    let mut i = 0;
-    let mut c = vec![0; n];
-    while more {
-        result[i] = &set[c[i]];
+    let copied = result.as_slice() as *const [&T];
 
-        if i == n_1 {
-            c[i] += 1;
-            cb(&result);
-        }
-
-        if i < n_1 {
-            i += 1;
-        }
-
-        while c[i] == n {
-            c[i] = 0;
-            
-            if i == 0 {
-                more = false;
-                break;
-            }
-
-            i -= 1;
-            c[i] += 1;
-        }
-
+    unsafe {
+        // It'd safe to use pointer here because internally,
+        // the callback will be called after result mutation closure
+        // and it will wait until the callback function return to 
+        // resume mutate the result again.
+        _cartesian_product_core(
+            n, 
+            #[inline(always)] |_| {
+                set.len()
+            }, 
+            #[inline(always)]  |i, c| {
+                result[i] = &set[c];
+            }, 
+            #[inline(always)] || {
+                cb(&*copied);
+            });
     }
+    
+    // let mut result = vec![&set[0]; n];
+    // let mut more = true;
+    // let n_1 = n - 1;
+    // let mut i = 0;
+    // let mut c = vec![0; n];
+    // while more {
+    //     result[i] = &set[c[i]];
+
+    //     if i == n_1 {
+    //         c[i] += 1;
+    //         cb(&result);
+    //     }
+
+    //     if i < n_1 {
+    //         i += 1;
+    //     }
+
+    //     while c[i] == n {
+    //         c[i] = 0;
+            
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
+
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
+
+    // }
 }
 
 /// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
@@ -826,7 +946,7 @@ pub fn self_cartesian_product<T>(set : &[T], n : usize, mut cb : impl FnMut(&[&T
 ///    }
 ///
 ///    unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [&'a i32], consumers : Vec<Box<Consumer + 'a>>) {
-///        unsafe_self_cartesian_product(data, cur_result, || {
+///        unsafe_self_cartesian_product(data, n, cur_result, || {
 ///            consumers.iter().for_each(|c| {
 ///                c.consume();
 ///            })
@@ -835,7 +955,7 @@ pub fn self_cartesian_product<T>(set : &[T], n : usize, mut cb : impl FnMut(&[&T
 /// 
 ///    let data : &[i32] = &[1, 2, 3];
 ///    let n = 3;
-///    let mut result = vec![&data[0][0]; data.len()];
+///    let mut result = vec![&data[0]; n];
 ///
 ///    unsafe {
 ///
@@ -852,36 +972,44 @@ pub fn self_cartesian_product<T>(set : &[T], n : usize, mut cb : impl FnMut(&[&T
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, result : *mut [&'a T], mut cb : impl FnMut()) {
-    let mut more = true;
-    let mut i = 0;
-    let n_1 = n - 1;
-    let mut c = vec![0; n];
-    while more {
-        (*result)[i] = &set[c[i]];
+pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, result : *mut [&'a T], cb : impl FnMut()) {
+    _cartesian_product_core(
+        n, 
+        #[inline(always)] |_| {
+            set.len()
+        }, 
+        #[inline(always)]  |i, c| {
+            (*result)[i] = &set[c];
+        }, cb);
+    // let mut more = true;
+    // let mut i = 0;
+    // let n_1 = n - 1;
+    // let mut c = vec![0; n];
+    // while more {
+    //     (*result)[i] = &set[c[i]];
 
-        if i == n_1 {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n_1 {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n_1 {
-            i += 1;
-        }
+    //     if i < n_1 {
+    //         i += 1;
+    //     }
 
-        while c[i] == n {
-            c[i] = 0;
+    //     while c[i] == set.len() {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.self_cartesian_product.html) 
@@ -954,7 +1082,7 @@ pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, resu
 /// 
 ///    let data : &[i32] = &[1, 2, 3];
 ///    let n = 3;
-///    let mut result = vec![&data[0][0]; data.len()];
+///    let mut result = vec![&data[0]; n];
 ///
 ///    let shared = Rc::new(RefCell::new(result.as_mut_slice()));
 ///    let worker1 = Worker1 {
@@ -968,36 +1096,44 @@ pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, resu
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub fn self_cartesian_product_cell<'a, T>(set : &'a[T], n : usize, result : Rc<RefCell<&'a mut [&'a T]>>, mut cb : impl FnMut()) {
-    let mut more = true;
-    let mut i = 0;
-    let n_1 = n - 1;
-    let mut c = vec![0; n];
-    while more {
-        result.borrow_mut()[i] = &set[c[i]];
+pub fn self_cartesian_product_cell<'a, T>(set : &'a[T], n : usize, result : Rc<RefCell<&'a mut [&'a T]>>, cb : impl FnMut()) {
+    _cartesian_product_core(
+        n, 
+        #[inline(always)] |_| {
+            set.len()
+        }, 
+        #[inline(always)]  |i, c| {
+            result.borrow_mut()[i] = &set[c];
+        }, cb);
+    // let mut more = true;
+    // let mut i = 0;
+    // let n_1 = n - 1;
+    // let mut c = vec![0; n];
+    // while more {
+    //     result.borrow_mut()[i] = &set[c[i]];
 
-        if i == n_1 {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n_1 {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n_1 {
-            i += 1;
-        }
+    //     if i < n_1 {
+    //         i += 1;
+    //     }
 
-        while c[i] == n {
-            c[i] = 0;
+    //     while c[i] == n {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
@@ -1094,36 +1230,44 @@ pub fn self_cartesian_product_cell<'a, T>(set : &'a[T], n : usize, result : Rc<R
 /// ```
 /// # See
 /// - [cartesian_product function](fn.cartesian_product.html)
-pub fn self_cartesian_product_sync<'a, T>(set : &'a[T], n : usize, result : Arc<RwLock<Vec<&'a T>>>, mut cb : impl FnMut()) {
-    let mut more = true;
-    let mut i = 0;
-    let n_1 = n - 1;
-    let mut c = vec![0; n];
-    while more {
-        result.write().unwrap()[i] = &set[c[i]];
+pub fn self_cartesian_product_sync<'a, T>(set : &'a[T], n : usize, result : Arc<RwLock<Vec<&'a T>>>, cb : impl FnMut()) {
+    _cartesian_product_core(
+        n, 
+        #[inline(always)] |_| {
+            set.len()
+        }, 
+        #[inline(always)]  |i, c| {
+            result.write().unwrap()[i] = &set[c];
+        }, cb);
+    // let mut more = true;
+    // let mut i = 0;
+    // let n_1 = n - 1;
+    // let mut c = vec![0; n];
+    // while more {
+    //     result.write().unwrap()[i] = &set[c[i]];
 
-        if i == n_1 {
-            c[i] += 1;
-            cb();
-        }
+    //     if i == n_1 {
+    //         c[i] += 1;
+    //         cb();
+    //     }
 
-        if i < n_1 {
-            i += 1;
-        }
+    //     if i < n_1 {
+    //         i += 1;
+    //     }
 
-        while c[i] == n {
-            c[i] = 0;
+    //     while c[i] == n {
+    //         c[i] = 0;
             
-            if i == 0 {
-                more = false;
-                break;
-            }
+    //         if i == 0 {
+    //             more = false;
+    //             break;
+    //         }
 
-            i -= 1;
-            c[i] += 1;
-        }
+    //         i -= 1;
+    //         c[i] += 1;
+    //     }
 
-    }
+    // }
 }
 
 /// Generate a combination out of given `domain`.
@@ -1466,7 +1610,35 @@ pub fn combination_sync<'a, T>(domain: &'a[T], r : usize, result : Arc<RwLock<Ve
     }
 }
 
+/// A core heap permutation algorithm.
+/// # Parameters
+/// - `n` size of entire data
+/// - `swap` a closure to swap the data
+/// - `cb` a callback function that get call on each permutation
+/// # Closure execution sequence
+/// 1. `swap` once
+/// 2. `cb` once
+/// 3. go to step 1 until permutation is `n` times
+fn _heap_permutation_core(n : usize, mut swap : impl FnMut(usize, usize), mut cb : impl FnMut()) {
+    let mut c = vec![0; n];
+    let mut i = 0;
+    while i < n {
+        if c[i] < i {
+            if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
+                swap(0, i);
+            } else {
+                swap(c[i], i);
+            }
 
+            cb();
+            c[i] += 1;
+            i = 0;
+        } else {
+            c[i] = 0;
+            i += 1;
+        }
+    }
+}
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
 /// for each permutation done on `d`. 
@@ -1495,26 +1667,40 @@ pub fn combination_sync<'a, T>(domain: &'a[T], r : usize, result : Arc<RwLock<Ve
 /// 
 /// # Notes
 /// 1. The value passed to callback function will equals to value inside parameter `d`.
-pub fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) {
-    let n = d.len();
-    let mut c = vec![0; n];
-    let mut i = 0;
-    while i < n {
-        if c[i] < i {
-            if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-                d.swap(0, i);
-            } else {
-                d.swap(c[i], i);
-            }
-
-            cb(d);
-            c[i] += 1;
-            i = 0;
-        } else {
-            c[i] = 0;
-            i += 1;
-        }
+pub fn heap_permutation<'a, T>(d : &'a mut [T], mut cb : impl FnMut(&'a [T]) -> ()) {
+    let copied = d as *const [T];
+    unsafe {
+        // It'd safe because the mutation on `d` will be done
+        // before calling `cb` closure and until `cb` closure is return
+        // the mutation closure won't get call.
+        _heap_permutation_core(
+            d.len(), 
+            #[inline(always)] |from, to| {
+                d.swap(from, to);
+            }, 
+            #[inline(always)] || {
+                cb(&*copied)
+            });
     }
+    // let n = d.len();
+    // let mut c = vec![0; n];
+    // let mut i = 0;
+    // while i < n {
+    //     if c[i] < i {
+    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
+    //             d.swap(0, i);
+    //         } else {
+    //             d.swap(c[i], i);
+    //         }
+
+    //         cb(d);
+    //         c[i] += 1;
+    //         i = 0;
+    //     } else {
+    //         c[i] = 0;
+    //         i += 1;
+    //     }
+    // }
 }
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
@@ -1542,26 +1728,37 @@ pub fn heap_permutation<T>(d : &mut [T], mut cb : impl FnMut(&[T]) -> ()) {
 /// 
 /// # Notes
 /// 1. The value passed to callback function will equals to value inside parameter `d`.
-pub fn heap_permutation_cell<T>(d : &Rc<RefCell<&mut [T]>>, mut cb : impl FnMut() -> ()) {
-    let n = d.borrow().len();
-    let mut c = vec![0; n];
-    let mut i = 0;
-    while i < n {
-        if c[i] < i {
-            if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-                d.borrow_mut().swap(0, i);
-            } else {
-                d.borrow_mut().swap(c[i], i);
-            }
+pub fn heap_permutation_cell<T>(d : &Rc<RefCell<&mut [T]>>, cb : impl FnMut() -> ()) {
+    // need borrow expr outside function call because if the expr is
+    // put inline within the function call, Rust runtime hold borrowed `d`
+    // for an entire function call
+    let n = d.borrow().len(); 
+    _heap_permutation_core(
+        n, 
+        #[inline(always)] |from, to| {
+            d.borrow_mut().swap(from, to);
+        }, 
+        cb
+    );
+    // let n = d.borrow().len();
+    // let mut c = vec![0; n];
+    // let mut i = 0;
+    // while i < n {
+    //     if c[i] < i {
+    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
+    //             d.borrow_mut().swap(0, i);
+    //         } else {
+    //             d.borrow_mut().swap(c[i], i);
+    //         }
 
-            cb();
-            c[i] += 1;
-            i = 0;
-        } else {
-            c[i] = 0;
-            i += 1;
-        }
-    }
+    //         cb();
+    //         c[i] += 1;
+    //         i = 0;
+    //     } else {
+    //         c[i] = 0;
+    //         i += 1;
+    //     }
+    // }
 }
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
@@ -1577,26 +1774,56 @@ pub fn heap_permutation_cell<T>(d : &Rc<RefCell<&mut [T]>>, mut cb : impl FnMut(
 /// 
 /// # Notes
 /// 1. The value passed to callback function will equals to value inside parameter `d`.
-pub fn heap_permutation_sync<T>(d : &Arc<RwLock<Vec<T>>>, mut cb : impl FnMut() -> ()) {
+pub fn heap_permutation_sync<T>(d : &Arc<RwLock<Vec<T>>>, cb : impl FnMut() -> ()) {
+    // need read lock expr outside function call because if the expr is
+    // put inline within the function call, Rust runtime obtain the lock
+    // for an entire function call
     let n = d.read().unwrap().len();
-    let mut c = vec![0; n];
-    let mut i = 0;
-    while i < n {
-        if c[i] < i {
-            if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-                d.write().unwrap().swap(0, i);
-            } else {
-                d.write().unwrap().swap(c[i], i);
-            }
+    _heap_permutation_core(
+        n, 
+        #[inline(always)] |from, to| {
+            d.write().unwrap().swap(from, to);
+        }, 
+        cb
+    );
+    // let n = d.read().unwrap().len();
+    // let mut c = vec![0; n];
+    // let mut i = 0;
+    // while i < n {
+    //     if c[i] < i {
+    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
+    //             d.write().unwrap().swap(0, i);
+    //         } else {
+    //             d.write().unwrap().swap(c[i], i);
+    //         }
 
-            cb();
-            c[i] += 1;
-            i = 0;
-        } else {
-            c[i] = 0;
-            i += 1;
+    //         cb();
+    //         c[i] += 1;
+    //         i = 0;
+    //     } else {
+    //         c[i] = 0;
+    //         i += 1;
+    //     }
+    // }
+}
+
+macro_rules! _k_permutation_core {
+    ($k : ident, $map : ident, $n : ident, $result : expr, $swap_fn : expr, $permute_fn : expr, $cb : expr) => {
+        if $n < $k {
+            panic!("Cannot create k-permutation of size {} for data of length {}", $k, $n);
+        } else if $k == 0 {
+            // k = 0 mean mean permutation frame size is 0, it cannot have permutation
+            return
         }
-    }
+
+        $cb;
+        $permute_fn; // generate all possible permutation for initial subset
+
+        while let Some(_) = $swap_fn { // repeatly swap element
+            $cb;
+            $permute_fn; // generate all possible permutation per each subset
+        }
+    };
 }
 
 /// Generate k-permutation over slice of `d`. For example: d = &[1, 2, 3]; k = 2.
@@ -1655,25 +1882,40 @@ pub fn heap_permutation_sync<T>(d : &Arc<RwLock<Vec<T>>>, mut cb : impl FnMut() 
 /// - [Gosper's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Combinatorial_number_system#Applications)
 /// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
 pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) {
-    if d.len() < k {
-        panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    } else if k == 0 {
-        // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-        return
-    }
+    let n = d.len();
+    let (ref mut result, ref mut map) = create_k_set(d, k);
+    let result = result.as_mut_slice();
 
-    let (mut subset, mut map) = create_k_set(d, k); // utility function to create initial subset
-    cb(&subset);
-    heap_permutation(&mut subset, |permuted| {
-        cb(permuted);
-    }); // generate all possible permutation for initial subset
-
-    while let Some(_) = swap_k((&mut subset, &mut map), d) { // repeatly swap element
-        cb(&subset);
-        heap_permutation(&mut subset, |permuted| {
+    _k_permutation_core! {
+        k,
+        map,
+        n, 
+        result, 
+        swap_k((result, map), d),
+        heap_permutation(result, |permuted| {
             cb(permuted);
-        }); // generate all possible permutation per each subset
-    }
+        }),
+        cb(&*result)
+    };
+    // if d.len() < k {
+    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
+    // } else if k == 0 {
+    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
+    //     return
+    // }
+
+    // let (mut subset, mut map) = create_k_set(d, k); // utility function to create initial subset
+    // cb(&subset);
+    // heap_permutation(&mut subset, |permuted| {
+    //     cb(permuted);
+    // }); // generate all possible permutation for initial subset
+
+    // while let Some(_) = swap_k((&mut subset, &mut map), d) { // repeatly swap element
+    //     cb(&subset);
+    //     heap_permutation(&mut subset, |permuted| {
+    //         cb(permuted);
+    //     }); // generate all possible permutation per each subset
+    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -1764,27 +2006,43 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[&T]) -> ()) {
 /// # See
 /// - [k_permutation function](fn.k_permutation.html)
 pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut [&'a T], mut cb : impl FnMut() -> ()) {
-    if d.len() < k {
-        panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    } else if k == 0 {
-        // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-        return
-    }
+    let n = d.len();
+    let mut map = 0;
+    unsafe_create_k_set(d, k, result, &mut map);
+    let result = &mut *result;
 
-    let mut map : u128 = 0;
-
-    unsafe_create_k_set(d, k, result, &mut map); // utility function to create initial subset
-    cb();
-    heap_permutation(&mut *result, |_| {
-        cb();
-    }); // generate all possible permutation for initial subset
-
-    while let Some(_) = swap_k((&mut *result, &mut map), d) { // repeatly swap element
-        cb();
-        heap_permutation(&mut *result, |_| {
+    _k_permutation_core! {
+        k,
+        map,
+        n, 
+        result, 
+        swap_k((result, &mut map), d),
+        heap_permutation(result, |_| {
             cb();
-        }); // generate all possible permutation per each subset
-    }
+        }),
+        cb()
+    };
+    // if d.len() < k {
+    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
+    // } else if k == 0 {
+    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
+    //     return
+    // }
+
+    // let mut map : u128 = 0;
+
+    // unsafe_create_k_set(d, k, result, &mut map); // utility function to create initial subset
+    // cb();
+    // heap_permutation(&mut *result, |_| {
+    //     cb();
+    // }); // generate all possible permutation for initial subset
+
+    // while let Some(_) = swap_k((&mut *result, &mut map), d) { // repeatly swap element
+    //     cb();
+    //     heap_permutation(&mut *result, |_| {
+    //         cb();
+    //     }); // generate all possible permutation per each subset
+    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -1868,27 +2126,42 @@ pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut 
 /// # See
 /// - [k_permutation function](fn.k_permutation.html)
 pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a mut [&'a T]>>, mut cb : impl FnMut() -> ()) {
-    if d.len() < k {
-        panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    } else if k == 0 {
-        // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-        return
-    }
+    let n = d.len();
+    let mut map = 0;
+    create_k_set_in_cell(d, k, &result, &mut map);
 
-    let mut map : u128 = 0;
-
-    create_k_set_in_cell(d, k, &result, &mut map); // utility function to create initial subset
-    cb();
-    heap_permutation_cell(&result, || {
-        cb();
-    }); // generate all possible permutation for initial subset
-
-    while let Some(_) = swap_k_in_cell((&result, &mut map), d) { // repeatly swap element
-        cb();
+    _k_permutation_core! {
+        k,
+        map,
+        n, 
+        result, 
+        swap_k_in_cell((&result, &mut map), d),
         heap_permutation_cell(&result, || {
             cb();
-        }); // generate all possible permutation per each subset
-    }
+        }),
+        cb()
+    };
+    // if d.len() < k {
+    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
+    // } else if k == 0 {
+    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
+    //     return
+    // }
+
+    // let mut map : u128 = 0;
+
+    // create_k_set_in_cell(d, k, &result, &mut map); // utility function to create initial subset
+    // cb();
+    // heap_permutation_cell(&result, || {
+    //     cb();
+    // }); // generate all possible permutation for initial subset
+
+    // while let Some(_) = swap_k_in_cell((&result, &mut map), d) { // repeatly swap element
+    //     cb();
+    //     heap_permutation_cell(&result, || {
+    //         cb();
+    //     }); // generate all possible permutation per each subset
+    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -1995,27 +2268,42 @@ pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a
 /// # See
 /// - [k_permutation function](fn.k_permutation.html)
 pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec<&'a T>>>, mut cb : impl FnMut() -> ()) {
-    if d.len() < k {
-        panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    } else if k == 0 {
-        // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-        return
-    }
+    let n = d.len();
+    let mut map = 0;
+    create_k_set_sync(d, k, &result, &mut map);
 
-    let mut map : u128 = 0;
-
-    create_k_set_sync(d, k, &result, &mut map); // utility function to create initial subset
-    cb();
-    heap_permutation_sync(&result, || {
-        cb();
-    }); // generate all possible permutation for initial subset
-
-    while let Some(_) = swap_k_sync((&result, &mut map), d) { // repeatly swap element
-        cb();
+    _k_permutation_core! {
+        k,
+        map,
+        n, 
+        result, 
+        swap_k_sync((&result, &mut map), d),
         heap_permutation_sync(&result, || {
             cb();
-        }); // generate all possible permutation per each subset
-    }
+        }),
+        cb()
+    };
+    // if d.len() < k {
+    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
+    // } else if k == 0 {
+    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
+    //     return
+    // }
+
+    // let mut map : u128 = 0;
+
+    // create_k_set_sync(d, k, &result, &mut map); // utility function to create initial subset
+    // cb();
+    // heap_permutation_sync(&result, || {
+    //     cb();
+    // }); // generate all possible permutation for initial subset
+
+    // while let Some(_) = swap_k_sync((&result, &mut map), d) { // repeatly swap element
+    //     cb();
+    //     heap_permutation_sync(&result, || {
+    //         cb();
+    //     }); // generate all possible permutation per each subset
+    // }
 }
 
 /// A trait that add reset function to an existing Iterator.
@@ -2026,6 +2314,48 @@ pub trait IteratorReset {
     fn reset(&mut self);
 }
 
+#[inline(always)]
+fn _cartesian_next_core<'a>(
+    i : &mut usize, 
+    c : &mut Vec<usize>, 
+    exhausted : &mut bool,
+    n : usize,
+    domain_len : impl Fn(usize) -> usize,
+    mut into_result : impl FnMut(usize, usize) + 'a) 
+{
+    // move and set `result` and `c` up until all `domains` processed
+    while *i < n && ! *exhausted {
+        // if current domain is exhausted.
+        if c[*i] == domain_len(*i) {
+            // reset all exhausted domain in `result` and `c`
+            let mut k = *i;
+
+            // reset all exhausted until either found non-exhausted or reach first domain
+            while c[k] == domain_len(k) && k > 0 {
+                c[k] = 1;
+                // self.result[k] = &self.domains[k][0];
+                into_result(k, 0);
+                k -= 1;
+            }
+
+            if k == 0 && c[k] == domain_len(k) {
+                // if first domain is also exhausted then flag it.
+                *exhausted = true;
+            } else {
+                // otherwise advance c[k] and set result[k] to next value
+                // self.result[k] = &self.domains[k][self.c[k]];
+                into_result(k, c[k]);
+                c[k] += 1;
+            }
+        } else {
+            // non exhausted domain, advance `c` and set result
+            // self.result[self.i] = &self.domains[self.i][self.c[self.i]];
+            into_result(*i, c[*i]);
+            c[*i] += 1;
+        }
+        *i += 1;
+    }
+}
 /// Generate a cartesian product between given domains in an iterator style.
 /// The struct implement `Iterator` trait so it can be used in `Iterator` 
 /// style. The struct provide [into_iter()](#method.into_iter()) function 
@@ -2097,41 +2427,57 @@ impl<'a, T> Iterator for CartesianProductIterator<'a, T> {
     /// 
     /// Return None when exhausted.
     fn next(&mut self) -> Option<Vec<&'a T>> {
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.domains[self.i].len() {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
+        // // move and set `result` and `c` up until all `domains` processed
+        // while self.i < self.domains.len() && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.domains[self.i].len() {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
 
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.domains[k].len() && k > 0 {
-                    self.c[k] = 1;
-                    self.result[k] = &self.domains[k][0];
-                    k -= 1;
-                }
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.domains[k].len() && k > 0 {
+        //             self.c[k] = 1;
+        //             self.result[k] = &self.domains[k][0];
+        //             k -= 1;
+        //         }
 
-                if k == 0 && self.c[k] == self.domains[k].len() {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    self.result[k] = &self.domains[k][self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                self.result[self.i] = &self.domains[self.i][self.c[self.i]];
-                self.c[self.i] += 1;
+        //         if k == 0 && self.c[k] == self.domains[k].len() {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             self.result[k] = &self.domains[k][self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         self.result[self.i] = &self.domains[self.i][self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
+        let domains = self.domains;
+        let result = &mut self.result;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            domains.len(),
+            #[inline(always)]
+            |k| {
+                domains[k].len()
+            },
+            #[inline(always)]
+            |i, j| {
+                result[i] = &domains[i][j];
             }
-            self.i += 1;
-        }
+        );
 
         if self.exhausted {
             None
         } else {
             self.i -= 1; // rewind `i` back to last domain
-            Some(self.result.to_owned())
+            Some(result.to_owned())
         }
     }
 }
@@ -2226,36 +2572,51 @@ impl<'a, T> Iterator for CartesianProductCellIter<'a, T> where T : 'a {
     /// no new result.
     fn next(&mut self) -> Option<()> {
         let mut result = self.result.borrow_mut();
+        let domains = self.domains;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            domains.len(),
+            #[inline(always)]
+            |k| {
+                domains[k].len()
+            },
+            #[inline(always)]
+            |i, j| {
+                result[i] = &domains[i][j];
+            }
+        );
         
         // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.domains[self.i].len() {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
+        // while self.i < self.domains.len() && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.domains[self.i].len() {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
 
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.domains[k].len() && k > 0 {
-                    self.c[k] = 1;
-                    result[k] = &self.domains[k][0];
-                    k -= 1;
-                }
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.domains[k].len() && k > 0 {
+        //             self.c[k] = 1;
+        //             result[k] = &self.domains[k][0];
+        //             k -= 1;
+        //         }
 
-                if k == 0 && self.c[k] == self.domains[k].len() {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    result[k] = &self.domains[k][self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                result[self.i] = &self.domains[self.i][self.c[self.i]];
-                self.c[self.i] += 1;
-            }
-            self.i += 1;
-        }
+        //         if k == 0 && self.c[k] == self.domains[k].len() {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             result[k] = &self.domains[k][self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         result[self.i] = &self.domains[self.i][self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
 
         if self.exhausted {
             None
@@ -2388,36 +2749,51 @@ impl<'a, T> Iterator for CartesianProductRefIter<'a, T> where T : 'a {
     /// no new result.
     fn next(&mut self) -> Option<()> {
         let result = &mut self.result;
-    
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.domains.len() && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.domains[self.i].len() {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
-
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.domains[k].len() && k > 0 {
-                    self.c[k] = 1;
-                    result[k] = &self.domains[k][0];
-                    k -= 1;
-                }
-
-                if k == 0 && self.c[k] == self.domains[k].len() {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    result[k] = &self.domains[k][self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                result[self.i] = &self.domains[self.i][self.c[self.i]];
-                self.c[self.i] += 1;
+        let domains = self.domains;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            domains.len(),
+            #[inline(always)]
+            |k| {
+                domains[k].len()
+            },
+            #[inline(always)]
+            |i, j| {
+                result[i] = &domains[i][j];
             }
-            self.i += 1;
-        }
+        );
+    
+        // // move and set `result` and `c` up until all `domains` processed
+        // while self.i < self.domains.len() && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.domains[self.i].len() {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
+
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.domains[k].len() && k > 0 {
+        //             self.c[k] = 1;
+        //             result[k] = &self.domains[k][0];
+        //             k -= 1;
+        //         }
+
+        //         if k == 0 && self.c[k] == self.domains[k].len() {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             result[k] = &self.domains[k][self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         result[self.i] = &self.domains[self.i][self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
 
         if self.exhausted {
             None
@@ -2441,6 +2817,24 @@ impl<'a, T> ExactSizeIterator for CartesianProductRefIter<'a, T> {
     fn len(&self) -> usize {
         self.domains.iter().fold(1, |cum, d| {cum * d.len()})
     }
+}
+
+#[inline(always)]
+fn _gosper_next_core(map : &mut u128, mut into_result : impl FnMut(usize, usize)) {
+    let mut i = 0;
+    let mut j = 0;
+    let mut mask = *map;
+    while mask > 0 {
+        if mask & 1 == 1 {
+            into_result(i, j);
+            i += 1;
+        }
+
+        mask >>= 1;
+        j += 1;
+    }
+
+    stanford_combination(map);
 }
 
 /// Create a combination iterator.
@@ -2548,20 +2942,29 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
 
         if 128 - self.x.leading_zeros() as usize > self.data.len() {
             return None
-        } else {
-            let mut j = 0;
-            let mut mask = self.x;
-            while mask > 0 {
-                if mask & 1 == 1 {
-                    combination.push(&self.data[j]);
-                }
+        } 
+        // else {
+        //     let mut j = 0;
+        //     let mut mask = self.x;
+        //     while mask > 0 {
+        //         if mask & 1 == 1 {
+        //             combination.push(&self.data[j]);
+        //         }
 
-                mask >>= 1;
-                j += 1;
+        //         mask >>= 1;
+        //         j += 1;
+        //     }
+        // }
+
+        // stanford_combination(&mut self.x);
+        let data = self.data;
+        let map = &mut self.x;
+        _gosper_next_core(map, 
+            #[inline(always)]
+            |_, j| {
+                combination.push(&data[j]);
             }
-        }
-
-        stanford_combination(&mut self.x);
+        );
 
         return Some(combination)
     }
@@ -2693,22 +3096,33 @@ impl<'a, T> Iterator for CombinationCellIter<'a, T> {
     fn next(&mut self) -> Option<()> {
         if 128 - self.x.leading_zeros() as usize > self.data.len() {
             return None
-        } else {
-            let mut i = 0;
-            let mut j = 0;
-            let mut mask = self.x;
-            while mask > 0 {
-                if mask & 1 == 1 {
-                    self.result.borrow_mut()[i] = &self.data[j];
-                    i += 1;
-                }
+        } 
+        // else {
+        //     let mut i = 0;
+        //     let mut j = 0;
+        //     let mut mask = self.x;
+        //     while mask > 0 {
+        //         if mask & 1 == 1 {
+        //             self.result.borrow_mut()[i] = &self.data[j];
+        //             i += 1;
+        //         }
 
-                mask >>= 1;
-                j += 1;
+        //         mask >>= 1;
+        //         j += 1;
+        //     }
+        // }
+
+        // stanford_combination(&mut self.x);
+        
+        let data = self.data;
+        let map = &mut self.x;
+        let mut result = self.result.borrow_mut();
+        _gosper_next_core(map, 
+            #[inline(always)]
+            |i, j| {
+                result[i] = &data[j];
             }
-        }
-
-        stanford_combination(&mut self.x);
+        );
 
         return Some(())
     }
@@ -2855,22 +3269,32 @@ impl<'a, T> Iterator for CombinationRefIter<'a, T> {
     fn next(&mut self) -> Option<()> {
         if 128 - self.x.leading_zeros() as usize > self.data.len() {
             return None
-        } else {
-            let mut i = 0;
-            let mut j = 0;
-            let mut mask = self.x;
-            while mask > 0 {
-                if mask & 1 == 1 {
-                    self.result[i] = &self.data[j];
-                    i += 1;
-                }
+        } 
+        // else {
+        //     let mut i = 0;
+        //     let mut j = 0;
+        //     let mut mask = self.x;
+        //     while mask > 0 {
+        //         if mask & 1 == 1 {
+        //             self.result[i] = &self.data[j];
+        //             i += 1;
+        //         }
 
-                mask >>= 1;
-                j += 1;
+        //         mask >>= 1;
+        //         j += 1;
+        //     }
+        // }
+
+        // stanford_combination(&mut self.x);
+        let data = self.data;
+        let map = &mut self.x;
+        let result = &mut self.result;
+        _gosper_next_core(map, 
+            #[inline(always)]
+            |i, j| {
+                result[i] = &data[j];
             }
-        }
-
-        stanford_combination(&mut self.x);
+        );
 
         return Some(())
     }
@@ -2888,6 +3312,32 @@ impl<'a, T> ExactSizeIterator for CombinationRefIter<'a, T> {
     fn len(&self) -> usize {
         let n = self.data.len();
         divide_factorial(n, multiply_factorial(n - self.r, self.r))
+    }
+}
+
+#[inline(always)]
+fn _heap_next_core(
+    c : &mut[usize], 
+    i : &mut usize, 
+    n : usize, 
+    mut swap_fn : impl FnMut(usize, usize)) 
+{
+    while *i < n {
+        if c[*i] < *i {
+            if *i % 2 == 0 {
+                // self.data.swap(0, *i);
+                swap_fn(0, *i);
+            } else {
+                swap_fn(c[*i], *i);
+            }
+
+            c[*i] += 1;
+            *i = 0;
+            return
+        } else {
+            c[*i] = 0;
+            *i += 1;
+        }
     }
 }
 
@@ -2917,7 +3367,7 @@ impl<'a, T> ExactSizeIterator for CombinationRefIter<'a, T> {
 /// # See
 /// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
 pub struct HeapPermutationIterator<'a, T> where T : 'a {
-    c : Vec<usize>,
+    c : Box<[usize]>,
     data : &'a mut [T],
     i : usize
 }
@@ -2928,7 +3378,7 @@ impl<'a, T> HeapPermutationIterator<'a, T> {
     /// in placed at first call to next.
     pub fn new(data : &mut [T]) -> HeapPermutationIterator<T> {
         HeapPermutationIterator {
-            c : vec![0; data.len()],
+            c : vec![0; data.len()].into_boxed_slice(),
             data : data,
             i : 0
         }
@@ -2946,26 +3396,38 @@ impl<'a, T> Iterator for HeapPermutationIterator<'a, T> where T : Clone {
     type Item = Vec<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let i = &mut self.i;
-
-        while *i < self.data.len() {
-            if self.c[*i] < *i {
-                if *i % 2 == 0 {
-                    self.data.swap(0, *i);
-                } else {
-                    self.data.swap(self.c[*i], *i);
-                }
-
-                self.c[*i] += 1;
-                *i = 0;
-                return Some(self.data.to_vec())
-            } else {
-                self.c[*i] = 0;
-                *i += 1;
+        let HeapPermutationIterator {ref mut c, ref mut data, ref mut i } = self;
+        let n = data.len();
+        let mut result : Option<Vec<T>> = None;
+        _heap_next_core(c, i, n, 
+            #[inline(always)]
+            |from, to| {
+                data.swap(from, to);
+                result = Some(data.to_owned());
             }
-        }
+        );
 
-        None
+        result
+        // let i = &mut self.i;
+
+        // while *i < self.data.len() {
+        //     if self.c[*i] < *i {
+        //         if *i % 2 == 0 {
+        //             self.data.swap(0, *i);
+        //         } else {
+        //             self.data.swap(self.c[*i], *i);
+        //         }
+
+        //         self.c[*i] += 1;
+        //         *i = 0;
+        //         return Some(self.data.to_vec())
+        //     } else {
+        //         self.c[*i] = 0;
+        //         *i += 1;
+        //     }
+        // }
+
+        // None
     }
 }
 
@@ -2980,107 +3442,6 @@ impl<'a, T> IteratorReset for HeapPermutationIterator<'a, T> {
 }
 
 impl<'a, T> ExactSizeIterator for HeapPermutationIterator<'a, T> where T : Clone {
-    fn len(&self) -> usize {
-        factorial(self.data.len())
-    }
-}
-
-/// An unsafe Heap's permutation in iterator style implementation.
-/// 
-/// # Examples
-/// - Iterator style usage example:
-/// ```
-///    use permutator::HeapPermutationRefIter;
-///    use std::time::{Instant};
-///    let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
-///    println!("0:{:?}", data);
-///    unsafe {
-///         let mut permutator = HeapPermutationRefIter::new(data as *mut[i32]);
-///         let timer = Instant::now();
-///         let mut counter = 1;
-///
-///         for permutated in permutator {
-///             println!("{}:{:?}", counter, permutated);
-///             counter += 1;
-///         }
-/// 
-///         // or use iterator related functional approach like line below.
-///         // permutator.into_iter().for_each(|permutated| {counter += 1;});
-///
-///         println!("Done {} permutations in {:?}", counter, timer.elapsed());
-///    }
-/// ```
-/// In test environment, given a slice of 8 strings. It has about 40 characters each.
-/// This implementation is about 70 times (33ms vs 0.47ms) faster than a [HeapPermutation](struct.HeapPermutation.html)
-/// iteration. This is because each `next` function doesn't clone/copy the value.  
-/// However, this implementation limited the way to use data because each iteration
-/// permute the result in place. It require user to manually sync the share operation.
-/// # See
-/// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
-pub struct HeapPermutationRefIter<'a, T> where T : 'a {
-    c : Vec<usize>,
-    data : &'a mut [T],
-    i : usize
-}
-
-impl<'a, T> HeapPermutationRefIter<'a, T> {
-    /// Construct a new permutation iterator.
-    /// Note: the provided parameter will get mutated
-    /// in placed at first call to next.
-    pub unsafe fn new(data : *mut [T]) -> HeapPermutationRefIter<'a, T> {
-        HeapPermutationRefIter {
-            c : vec![0; (*data).len()],
-            data : &mut *data,
-            i : 0
-        }
-    }
-
-    /// Consume itself immediately return it.
-    /// It mimic how `IntoIterator` trait perform except
-    /// that this struct itself implement `Iterator` trait.
-    pub fn into_iter(self) -> Self {
-        self
-    }
-}
-
-impl<'a, T> Iterator for HeapPermutationRefIter<'a, T> {
-    type Item = ();
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let i = &mut self.i;
-
-        while *i < self.data.len() {
-            if self.c[*i] < *i {
-                if *i % 2 == 0 {
-                    self.data.swap(0, *i);
-                } else {
-                    self.data.swap(self.c[*i], *i);
-                }
-
-                self.c[*i] += 1;
-                *i = 0;
-                return Some(())
-            } else {
-                self.c[*i] = 0;
-                *i += 1;
-            }
-        }
-
-        None
-    }
-}
-
-impl<'a, T> IteratorReset for HeapPermutationRefIter<'a, T> {
-    /// Reset this permutator so calling next will continue
-    /// permutation on current permuted data.
-    /// It will not reset permuted data.
-    fn reset(&mut self) {
-        self.i = 0;
-        self.c.iter_mut().for_each(|c| {*c = 0;});
-    }
-}
-
-impl<'a, T> ExactSizeIterator for HeapPermutationRefIter<'a, T> {
     fn len(&self) -> usize {
         factorial(self.data.len())
     }
@@ -3157,26 +3518,38 @@ impl<'a, T> Iterator for HeapPermutationCellIter<'a, T> where T : 'a {
     type Item= ();
 
     fn next(&mut self) -> Option<()> {
-        let i = &mut self.i;
-
-        while *i < self.data.borrow().len() {
-            if self.c[*i] < *i {
-                if *i % 2 == 0 {
-                    self.data.borrow_mut().swap(0, *i);
-                } else {
-                    self.data.borrow_mut().swap(self.c[*i], *i);
-                }
-
-                self.c[*i] += 1;
-                *i = 0;
-                return Some(())
-            } else {
-                self.c[*i] = 0;
-                *i += 1;
+        let HeapPermutationCellIter {ref mut c, ref mut data, ref mut i } = self;
+        let n = data.borrow().len();
+        let mut result : Option<()> = None;
+        _heap_next_core(c, i, n, 
+            #[inline(always)]
+            |from, to| {
+                data.borrow_mut().swap(from, to);
+                result = Some(());
             }
-        }
+        );
 
-        None
+        result
+        // let i = &mut self.i;
+
+        // while *i < self.data.borrow().len() {
+        //     if self.c[*i] < *i {
+        //         if *i % 2 == 0 {
+        //             self.data.borrow_mut().swap(0, *i);
+        //         } else {
+        //             self.data.borrow_mut().swap(self.c[*i], *i);
+        //         }
+
+        //         self.c[*i] += 1;
+        //         *i = 0;
+        //         return Some(())
+        //     } else {
+        //         self.c[*i] = 0;
+        //         *i += 1;
+        //     }
+        // }
+
+        // None
     }
 }
 
@@ -3194,6 +3567,191 @@ impl<'a, T> ExactSizeIterator for HeapPermutationCellIter<'a, T> {
     fn len(&self) -> usize {
         factorial(self.data.borrow().len())
     }
+}
+
+/// An unsafe Heap's permutation in iterator style implementation.
+/// 
+/// # Examples
+/// - Iterator style usage example:
+/// ```
+///    use permutator::HeapPermutationRefIter;
+///    use std::time::{Instant};
+///    let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
+///    println!("0:{:?}", data);
+///    unsafe {
+///         let mut permutator = HeapPermutationRefIter::new(data as *mut[i32]);
+///         let timer = Instant::now();
+///         let mut counter = 1;
+///
+///         for permutated in permutator {
+///             println!("{}:{:?}", counter, permutated);
+///             counter += 1;
+///         }
+/// 
+///         // or use iterator related functional approach like line below.
+///         // permutator.into_iter().for_each(|permutated| {counter += 1;});
+///
+///         println!("Done {} permutations in {:?}", counter, timer.elapsed());
+///    }
+/// ```
+/// In test environment, given a slice of 8 strings. It has about 40 characters each.
+/// This implementation is about 70 times (33ms vs 0.47ms) faster than a [HeapPermutation](struct.HeapPermutation.html)
+/// iteration. This is because each `next` function doesn't clone/copy the value.  
+/// However, this implementation limited the way to use data because each iteration
+/// permute the result in place. It require user to manually sync the share operation.
+/// # See
+/// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
+pub struct HeapPermutationRefIter<'a, T> where T : 'a {
+    c : Vec<usize>,
+    data : &'a mut [T],
+    i : usize
+}
+
+impl<'a, T> HeapPermutationRefIter<'a, T> {
+    /// Construct a new permutation iterator.
+    /// Note: the provided parameter will get mutated
+    /// in placed at first call to next.
+    pub unsafe fn new(data : *mut [T]) -> HeapPermutationRefIter<'a, T> {
+        HeapPermutationRefIter {
+            c : vec![0; (*data).len()],
+            data : &mut *data,
+            i : 0
+        }
+    }
+
+    /// Consume itself immediately return it.
+    /// It mimic how `IntoIterator` trait perform except
+    /// that this struct itself implement `Iterator` trait.
+    pub fn into_iter(self) -> Self {
+        self
+    }
+}
+
+impl<'a, T> Iterator for HeapPermutationRefIter<'a, T> {
+    type Item = ();
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let HeapPermutationRefIter {ref mut c, ref mut data, ref mut i } = self;
+        let n = data.len();
+        let mut result : Option<()> = None;
+        _heap_next_core(c, i, n, 
+            #[inline(always)]
+            |from, to| {
+                data.swap(from, to);
+                result = Some(());
+            }
+        );
+
+        result
+        // let i = &mut self.i;
+
+        // while *i < self.data.len() {
+        //     if self.c[*i] < *i {
+        //         if *i % 2 == 0 {
+        //             self.data.swap(0, *i);
+        //         } else {
+        //             self.data.swap(self.c[*i], *i);
+        //         }
+
+        //         self.c[*i] += 1;
+        //         *i = 0;
+        //         return Some(())
+        //     } else {
+        //         self.c[*i] = 0;
+        //         *i += 1;
+        //     }
+        // }
+
+        // None
+    }
+}
+
+impl<'a, T> IteratorReset for HeapPermutationRefIter<'a, T> {
+    /// Reset this permutator so calling next will continue
+    /// permutation on current permuted data.
+    /// It will not reset permuted data.
+    fn reset(&mut self) {
+        self.i = 0;
+        self.c.iter_mut().for_each(|c| {*c = 0;});
+    }
+}
+
+impl<'a, T> ExactSizeIterator for HeapPermutationRefIter<'a, T> {
+    fn len(&self) -> usize {
+        factorial(self.data.len())
+    }
+}
+
+unsafe fn _k_permutation_next_core<'a, T, U, V, W>(
+    combinator : T,
+    permutator : * mut Option<U>, 
+    permuted : V,
+    new_permutator_fn : impl FnMut(V) -> U + 'a
+) -> Option<()>
+where T : Iterator<Item=()>,
+      U : Iterator<Item=W> + IteratorReset,
+{
+    unsafe fn get_next<'a, T, U, V, W>(
+        combinator : T, 
+        permutator : *mut Option<U>, 
+        permuted : V,
+        new_permutator_fn : impl FnMut(V) -> U
+        ) -> Option<()> 
+        where T : Iterator<Item=()>,
+            U : Iterator<Item=W> + IteratorReset,
+        {
+        if let Some(ref mut perm) = *permutator {
+            if let Some(_) = perm.next() {
+                // get next permutation of current permutator
+                Some(())
+            } else {
+                if let Ok(_) = next_permutator(combinator, permutator, permuted, new_permutator_fn) {
+                    // now perm suppose to be new permutator.
+                    Some(())
+                } else {
+                    // all combination permuted
+                    return None;
+                }
+            }
+        } else {
+            if let Ok(_) = next_permutator(combinator, permutator, permuted, new_permutator_fn) {
+                if let Some(_) = *permutator {
+                    Some(())
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+
+    unsafe fn next_permutator<'a, T, U, V, W>(
+        mut combinator : T, 
+        permutator : *mut Option<U>, 
+        permuted : V,
+        mut new_permutator_fn : impl FnMut(V) -> U
+    ) -> Result<(), ()> 
+    where T : Iterator<Item=()>,
+        U : Iterator<Item=W> + IteratorReset
+    {
+        if let Some(_) = combinator.next() {
+            if let Some(ref mut permutator) = *permutator {
+                permutator.reset(); // fresh new permutator
+                Ok(())
+            } else {
+                // first time getting a permutator, need to create one.
+                // let new_permutator = HeapPermutationIterator::new(&mut *permuted);
+                let new_permutator = new_permutator_fn(permuted);
+                *permutator = Some(new_permutator);
+                Ok(())
+            }
+        } else {
+            Err(())
+        }
+    }
+
+    get_next(combinator, permutator, permuted, new_permutator_fn)
 }
 
 /// k-Permutation over data of length n where k must be
@@ -3296,55 +3854,72 @@ impl<'a, T> Iterator for KPermutationIterator<'a, T> {
     type Item = Vec<&'a T>;
 
     fn next(&mut self) -> Option<Vec<&'a T>> {
-        unsafe fn get_next<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Option<()> {
-            if let Some(ref mut perm) = *permutator {
-                if let Some(_) = perm.next() {
-                    // get next permutation of current permutator
-                    Some(())
-                } else {
-                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                        // now perm suppose to be new permutator.
-                        Some(())
-                    } else {
-                        // all combination permuted
-                        return None;
-                    }
-                }
-            } else {
-                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                    if let Some(_) = *permutator {
-                        Some(())
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            }
-        }
+        // unsafe fn get_next<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Option<()> {
+        //     if let Some(ref mut perm) = *permutator {
+        //         if let Some(_) = perm.next() {
+        //             // get next permutation of current permutator
+        //             Some(())
+        //         } else {
+        //             if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //                 // now perm suppose to be new permutator.
+        //                 Some(())
+        //             } else {
+        //                 // all combination permuted
+        //                 return None;
+        //             }
+        //         }
+        //     } else {
+        //         if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //             if let Some(_) = *permutator {
+        //                 Some(())
+        //             } else {
+        //                 return None;
+        //             }
+        //         } else {
+        //             return None;
+        //         }
+        //     }
+        // }
 
-        unsafe fn next_permutator<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Result<(), ()> {
-            if let Some(_) = combinator.next() {
-                if let Some(ref mut permutator) = *permutator {
-                    permutator.reset(); // fresh new permutator
-                    Ok(())
-                } else {
-                    // first time getting a permutator, need to create one.
-                    let new_permutator = HeapPermutationIterator::new(&mut *permuted);
-                    *permutator = Some(new_permutator);
-                    Ok(())
-                }
-            } else {
-                Err(())
-            }
-        }
+        // unsafe fn next_permutator<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut Vec<&'a T>, permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Result<(), ()> {
+        //     if let Some(_) = combinator.next() {
+        //         if let Some(ref mut permutator) = *permutator {
+        //             permutator.reset(); // fresh new permutator
+        //             Ok(())
+        //         } else {
+        //             // first time getting a permutator, need to create one.
+        //             let new_permutator = HeapPermutationIterator::new(&mut *permuted);
+        //             *permutator = Some(new_permutator);
+        //             Ok(())
+        //         }
+        //     } else {
+        //         Err(())
+        //     }
+        // }
+        // unsafe {
+        //     let permutator = &mut self.permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>;
+        //     let permuted = &mut self.permuted as *mut Vec<&'a T>;
+        //     if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+        //         return Some(self.permuted.to_vec());
+        //     } else {
+        //         return None;
+        //     }
+        // }
+        let combinator = &mut self.combinator;
+        let permutator = &mut self.permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>;
+        let permuted = &mut self.permuted as *mut Vec<&'a T>;
         unsafe {
-            let permutator = &mut self.permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>;
-            let permuted = &mut self.permuted as *mut Vec<&'a T>;
-            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
-                return Some(self.permuted.to_vec());
+            if let Some(_) = _k_permutation_next_core(
+                combinator, 
+                permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>, 
+                permuted, 
+                |comb| {
+                    HeapPermutationIterator::new((*comb).as_mut_slice())
+                }
+            ) {
+                Some(self.permuted.to_vec())
             } else {
-                return None;
+                None
             }
         }
     }
@@ -3466,52 +4041,67 @@ impl<'a, T> Iterator for KPermutationCellIter<'a, T> {
     type Item = ();
 
     fn next(&mut self) -> Option<()> {
-        unsafe fn get_next<'a, T>(combinator : &mut CombinationCellIter<'a, T>, permuted : Rc<RefCell<&'a mut[&'a T]>>, permutator : *mut Option<HeapPermutationCellIter<'a, &'a T>>) -> Option<()> {
-            if let Some(ref mut perm) = *permutator {
-                if let Some(_) = perm.next() {
-                    // get next permutation of current permutator
-                    Some(())
-                } else {
-                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                        // now perm suppose to be new permutator.
-                        Some(())
-                    } else {
-                        // all combination permuted
-                        return None;
-                    }
-                }
-            } else {
-                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                    if let Some(_) = *permutator {
-                        Some(())
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            }
-        }
+        // unsafe fn get_next<'a, T>(combinator : &mut CombinationCellIter<'a, T>, permuted : Rc<RefCell<&'a mut[&'a T]>>, permutator : *mut Option<HeapPermutationCellIter<'a, &'a T>>) -> Option<()> {
+        //     if let Some(ref mut perm) = *permutator {
+        //         if let Some(_) = perm.next() {
+        //             // get next permutation of current permutator
+        //             Some(())
+        //         } else {
+        //             if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //                 // now perm suppose to be new permutator.
+        //                 Some(())
+        //             } else {
+        //                 // all combination permuted
+        //                 return None;
+        //             }
+        //         }
+        //     } else {
+        //         if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //             if let Some(_) = *permutator {
+        //                 Some(())
+        //             } else {
+        //                 return None;
+        //             }
+        //         } else {
+        //             return None;
+        //         }
+        //     }
+        // }
 
-        unsafe fn next_permutator<'a, T>(combinator : &mut CombinationCellIter<'a, T>, permuted : Rc<RefCell<&'a mut [&'a T]>>, permutator : *mut Option<HeapPermutationCellIter<'a, &'a T>>) -> Result<(), ()> {
-            if let Some(_) = combinator.next() {
-                if let Some(ref mut permutator) = *permutator {
-                    permutator.reset(); // fresh new permutator
-                    Ok(())
-                } else {
-                    // first time getting a permutator, need to create one.
-                    let new_permutator = HeapPermutationCellIter::new(permuted);
-                    *permutator = Some(new_permutator);
-                    Ok(())
-                }
-            } else {
-                Err(())
-            }
-        }
+        // unsafe fn next_permutator<'a, T>(combinator : &mut CombinationCellIter<'a, T>, permuted : Rc<RefCell<&'a mut [&'a T]>>, permutator : *mut Option<HeapPermutationCellIter<'a, &'a T>>) -> Result<(), ()> {
+        //     if let Some(_) = combinator.next() {
+        //         if let Some(ref mut permutator) = *permutator {
+        //             permutator.reset(); // fresh new permutator
+        //             Ok(())
+        //         } else {
+        //             // first time getting a permutator, need to create one.
+        //             let new_permutator = HeapPermutationCellIter::new(permuted);
+        //             *permutator = Some(new_permutator);
+        //             Ok(())
+        //         }
+        //     } else {
+        //         Err(())
+        //     }
+        // }
+        // unsafe {
+        //     let permutator = &mut self.permutator as *mut Option<HeapPermutationCellIter<'a, &'a T>>;
+        //     let permuted = Rc::clone(&self.permuted);
+        //     if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+        //         return Some(());
+        //     } else {
+        //         return None;
+        //     }
+        // }
         unsafe {
             let permutator = &mut self.permutator as *mut Option<HeapPermutationCellIter<'a, &'a T>>;
             let permuted = Rc::clone(&self.permuted);
-            if let Some(_) = get_next(&mut self.combinator, permuted, permutator) {
+            if let Some(_) = _k_permutation_next_core(
+                &mut self.combinator, 
+                permutator,
+                permuted, 
+                |comb| {
+                    HeapPermutationCellIter::new(comb)
+                }) {
                 return Some(());
             } else {
                 return None;
@@ -3643,51 +4233,65 @@ impl<'a, T> Iterator for KPermutationRefIter<'a, T> {
     type Item = ();
 
     fn next(&mut self) -> Option<()> {
-        unsafe fn get_next<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut[&'a T], permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Option<()> {
-            if let Some(ref mut perm) = *permutator {
-                if let Some(_) = perm.next() {
-                    // get next permutation of current permutator
-                    Some(())
-                } else {
-                    if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                        // now perm suppose to be new permutator.
-                        Some(())
-                    } else {
-                        // all combination permuted
-                        return None;
-                    }
-                }
-            } else {
-                if let Ok(_) = next_permutator(combinator, permuted, permutator) {
-                    if let Some(_) = *permutator {
-                        Some(())
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            }
-        }
+        // unsafe fn get_next<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut[&'a T], permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Option<()> {
+        //     if let Some(ref mut perm) = *permutator {
+        //         if let Some(_) = perm.next() {
+        //             // get next permutation of current permutator
+        //             Some(())
+        //         } else {
+        //             if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //                 // now perm suppose to be new permutator.
+        //                 Some(())
+        //             } else {
+        //                 // all combination permuted
+        //                 return None;
+        //             }
+        //         }
+        //     } else {
+        //         if let Ok(_) = next_permutator(combinator, permuted, permutator) {
+        //             if let Some(_) = *permutator {
+        //                 Some(())
+        //             } else {
+        //                 return None;
+        //             }
+        //         } else {
+        //             return None;
+        //         }
+        //     }
+        // }
 
-        unsafe fn next_permutator<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut [&'a T], permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Result<(), ()> {
-            if let Some(_) = combinator.next() {
-                if let Some(ref mut permutator) = *permutator {
-                    permutator.reset(); // fresh new permutator
-                    Ok(())
-                } else {
-                    // first time getting a permutator, need to create one.
-                    let new_permutator = HeapPermutationIterator::new(&mut *permuted);
-                    *permutator = Some(new_permutator);
-                    Ok(())
-                }
-            } else {
-                Err(())
-            }
-        }
+        // unsafe fn next_permutator<'a, T>(combinator : &mut CombinationRefIter<'a, T>, permuted : *mut [&'a T], permutator : *mut Option<HeapPermutationIterator<'a, &'a T>>) -> Result<(), ()> {
+        //     if let Some(_) = combinator.next() {
+        //         if let Some(ref mut permutator) = *permutator {
+        //             permutator.reset(); // fresh new permutator
+        //             Ok(())
+        //         } else {
+        //             // first time getting a permutator, need to create one.
+        //             let new_permutator = HeapPermutationIterator::new(&mut *permuted);
+        //             *permutator = Some(new_permutator);
+        //             Ok(())
+        //         }
+        //     } else {
+        //         Err(())
+        //     }
+        // }
+        // unsafe {
+        //     let permutator = &mut self.permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>;
+        //     if let Some(_) = get_next(&mut self.combinator, self.permuted as *mut [&T], permutator) {
+        //         return Some(());
+        //     } else {
+        //         return None;
+        //     }
+        // }
         unsafe {
             let permutator = &mut self.permutator as *mut Option<HeapPermutationIterator<'a, &'a T>>;
-            if let Some(_) = get_next(&mut self.combinator, self.permuted as *mut [&T], permutator) {
+            if let Some(_) = _k_permutation_next_core(
+                &mut self.combinator, 
+                permutator,
+                self.permuted as *mut [&T], 
+                |comb| {
+                    HeapPermutationIterator::new(&mut *comb)
+                }) {
                 return Some(());
             } else {
                 return None;
@@ -3787,41 +4391,55 @@ impl<'a, T> Iterator for SelfCartesianProductIterator<'a, T> {
     /// 
     /// Return None when exhausted.
     fn next(&mut self) -> Option<Vec<&'a T>> {
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.n && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.n {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
+        // // move and set `result` and `c` up until all `domains` processed
+        // while self.i < self.n && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.n {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
 
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.n && k > 0 {
-                    self.c[k] = 1;
-                    self.result[k] = &self.domain[0];
-                    k -= 1;
-                }
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.n && k > 0 {
+        //             self.c[k] = 1;
+        //             self.result[k] = &self.domain[0];
+        //             k -= 1;
+        //         }
 
-                if k == 0 && self.c[k] == self.n {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    self.result[k] = &self.domain[self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                self.result[self.i] = &self.domain[self.c[self.i]];
-                self.c[self.i] += 1;
+        //         if k == 0 && self.c[k] == self.n {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             self.result[k] = &self.domain[self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         self.result[self.i] = &self.domain[self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
+        let result = &mut self.result;
+        let domain = self.domain;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            self.n,
+            |_| {
+                domain.len()
+            },
+            |i, j| {
+                result[i] = &domain[j];
             }
-            self.i += 1;
-        }
+        );
 
         if self.exhausted {
             None
         } else {
             self.i -= 1; // rewind `i` back to last domain
-            Some(self.result.to_owned())
+            Some(result.to_owned())
         }
     }
 }
@@ -3923,35 +4541,49 @@ impl<'a, T> Iterator for SelfCartesianProductCellIter<'a, T> {
     /// 
     /// Return None when exhausted.
     fn next(&mut self) -> Option<()> {
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.n && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.n {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
+        // // move and set `result` and `c` up until all `domains` processed
+        // while self.i < self.n && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.n {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
 
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.n && k > 0 {
-                    self.c[k] = 1;
-                    self.result.borrow_mut()[k] = &self.domain[0];
-                    k -= 1;
-                }
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.n && k > 0 {
+        //             self.c[k] = 1;
+        //             self.result.borrow_mut()[k] = &self.domain[0];
+        //             k -= 1;
+        //         }
 
-                if k == 0 && self.c[k] == self.n {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    self.result.borrow_mut()[k] = &self.domain[self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                self.result.borrow_mut()[self.i] = &self.domain[self.c[self.i]];
-                self.c[self.i] += 1;
+        //         if k == 0 && self.c[k] == self.n {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             self.result.borrow_mut()[k] = &self.domain[self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         self.result.borrow_mut()[self.i] = &self.domain[self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
+        let mut result = self.result.borrow_mut();
+        let domain = self.domain;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            self.n,
+            |_| {
+                domain.len()
+            },
+            |i, j| {
+                result[i] = &domain[j];
             }
-            self.i += 1;
-        }
+        );
 
         if self.exhausted {
             None
@@ -4060,35 +4692,49 @@ impl<'a, T> Iterator for SelfCartesianProductRefIter<'a, T> {
     /// 
     /// Return None when exhausted.
     fn next(&mut self) -> Option<()> {
-        // move and set `result` and `c` up until all `domains` processed
-        while self.i < self.n && !self.exhausted {
-            // if current domain is exhausted.
-            if self.c[self.i] == self.n {
-                // reset all exhausted domain in `result` and `c`
-                let mut k = self.i;
+        // // move and set `result` and `c` up until all `domains` processed
+        // while self.i < self.n && !self.exhausted {
+        //     // if current domain is exhausted.
+        //     if self.c[self.i] == self.n {
+        //         // reset all exhausted domain in `result` and `c`
+        //         let mut k = self.i;
 
-                // reset all exhausted until either found non-exhausted or reach first domain
-                while self.c[k] == self.n && k > 0 {
-                    self.c[k] = 1;
-                    self.result[k] = &self.domain[0];
-                    k -= 1;
-                }
+        //         // reset all exhausted until either found non-exhausted or reach first domain
+        //         while self.c[k] == self.n && k > 0 {
+        //             self.c[k] = 1;
+        //             self.result[k] = &self.domain[0];
+        //             k -= 1;
+        //         }
 
-                if k == 0 && self.c[k] == self.n {
-                    // if first domain is also exhausted then flag it.
-                    self.exhausted = true;
-                } else {
-                    // otherwise advance c[k] and set result[k] to next value
-                    self.result[k] = &self.domain[self.c[k]];
-                    self.c[k] += 1;
-                }
-            } else {
-                // non exhausted domain, advance `c` and set result
-                self.result[self.i] = &self.domain[self.c[self.i]];
-                self.c[self.i] += 1;
+        //         if k == 0 && self.c[k] == self.n {
+        //             // if first domain is also exhausted then flag it.
+        //             self.exhausted = true;
+        //         } else {
+        //             // otherwise advance c[k] and set result[k] to next value
+        //             self.result[k] = &self.domain[self.c[k]];
+        //             self.c[k] += 1;
+        //         }
+        //     } else {
+        //         // non exhausted domain, advance `c` and set result
+        //         self.result[self.i] = &self.domain[self.c[self.i]];
+        //         self.c[self.i] += 1;
+        //     }
+        //     self.i += 1;
+        // }
+        let result = &mut self.result;
+        let domain = self.domain;
+        _cartesian_next_core(
+            &mut self.i, 
+            &mut self.c, 
+            &mut self.exhausted,
+            self.n,
+            |_| {
+                domain.len()
+            },
+            |i, j| {
+                result[i] = &domain[j];
             }
-            self.i += 1;
-        }
+        );
 
         if self.exhausted {
             None
@@ -4207,7 +4853,9 @@ impl<'a, 'b: 'a, T> CartesianProduct<'a> for CartesianProductIntoCellParams<'b, 
     }
 }
 
-/// A type that used exclusively for [CartesianProductRefIter](struct.CartesianProductRefIter.html)
+/// A type that used exclusively for [trait CartesianProduct](trait.CartesianProduct.html).
+/// It return [CartesianProductRefIter](struct.CartesianProductRefIter.html).
+/// 
 /// It's a tuple where first element is a slice contains slices represents a domains
 /// of Cartesian product function. The second element is a mutable pointer to a slice which
 /// will be used to store each product.
@@ -4223,7 +4871,7 @@ pub type CartesianProductIntoRefParams<'a, T> = (&'a [&'a [T]], *mut [&'a T]);
 /// # Warning
 /// It hid unsafe object instantiation of [CartesianProductRefIter](struct.CartesianProductRefIter.html#method.new)
 /// from user but all unsafe conditions are still applied as long as
-/// the object life itself.
+/// the the life of object itself.
 /// 
 impl<'a, 'b: 'a, T> CartesianProduct<'a> for CartesianProductIntoRefParams<'b, T> 
     where T : 'b {
@@ -4233,6 +4881,66 @@ impl<'a, 'b: 'a, T> CartesianProduct<'a> for CartesianProductIntoRefParams<'b, T
     fn cart_prod(&'a self) -> Self::Producer {
         unsafe {
             CartesianProductRefIter::new(self.0, self.1)
+        }
+    }
+}
+
+/// A type that used exclusively for [trait CartesianProduct](trait.CartesianProduct.html).
+/// It return [SelfCartesianProductIterator](struct.SelfCartesianProductIterator.html).
+/// 
+/// # Format
+/// 1. A slice of T.
+/// 2. How many time to create a product on slice
+pub type SelfCartesianProduct<'a, T> = (&'a [T], usize);
+
+impl<'a, 'b : 'a, T> CartesianProduct<'a> for SelfCartesianProduct<'b, T>
+    where T : 'b {
+    type Producer = SelfCartesianProductIterator<'b, T>;
+
+    fn cart_prod(&'a self) -> Self::Producer {
+        SelfCartesianProductIterator::new(self.0, self.1)
+    }
+}
+
+/// A type that used exclusively for [trait CartesianProduct](trait.CartesianProduct.html).
+/// It return [SelfCartesianProductCellIter](struct.SelfCartesianProductCellIter.html).
+/// 
+/// # Format
+/// 1. A slice of T.
+/// 2. How many time to create a product on slice
+/// 3. An Rc<RefCell<&mut [T]>> to store each product on each iteration.
+pub type SelfCartesianProductIntoCellParams<'a, T> = (&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>);
+
+impl<'a, 'b : 'a, T> CartesianProduct<'a> for SelfCartesianProductIntoCellParams<'b, T>
+    where T : 'b {
+    type Producer = SelfCartesianProductCellIter<'b, T>;
+
+    fn cart_prod(&'a self) -> Self::Producer {
+        SelfCartesianProductCellIter::new(self.0, self.1, Rc::clone(&self.2))
+    }
+}
+
+/// A type that used exclusively for [trait CartesianProduct](trait.CartesianProduct.html).
+/// It return [SelfCartesianProductRefIter](struct.SelfCartesianProductRefIter.html).
+/// 
+/// # Format
+/// 1. A slice of T.
+/// 2. How many time to create a product on slice
+/// 3. A mutable pointer to a slice of ref T
+pub type SelfCartesianProductIntoRefParams<'a, T> = (&'a [T], usize, *mut [&'a T]);
+
+/// An implementation for convenient use of [SelfCartesianProductRefIter](struct.SelfCartesianProductRefIter.html)
+/// # Warning
+/// It hid unsafe object instantiation of [SelfCartesianProductRefIter](struct.SelfCartesianProductRefIter.html#method.new)
+/// from user but all unsafe conditions are still applied as long as
+/// the life of object itself.
+impl<'a, 'b : 'a, T> CartesianProduct<'a> for SelfCartesianProductIntoRefParams<'b, T>
+    where T : 'b {
+    type Producer = SelfCartesianProductRefIter<'b, T>;
+
+    fn cart_prod(&'a self) -> Self::Producer {
+        unsafe {
+            SelfCartesianProductRefIter::new(self.0, self.1, self.2)
         }
     }
 }
@@ -4345,7 +5053,7 @@ pub type CombinationIntoRefParams<'a, T> = (&'a [T], * mut[&'a T]);
 /// # Warning
 /// It hid unsafe object instantiation of [GosperCombinationRefIter](struct.GosperCombinationRefIter.html#method.new)
 /// from user but all unsafe conditions are still applied as long as
-/// the object life itself.
+/// the life of object itself.
 impl<'a, 'b : 'a, T> Combination<'a> for CombinationIntoRefParams<'b, T> {
     type Combinator = CombinationRefIter<'b, T>;
 
@@ -4421,11 +5129,7 @@ impl<'a, T> Permutation<'a> for [T] where T : 'a + Clone {
     type Permutator = HeapPermutationIterator<'a, T>;
 
     fn permutation(&'a mut self) -> HeapPermutationIterator<T> {
-        HeapPermutationIterator {
-            c : vec![0; self.len()],
-            data : self,
-            i : 0
-        }
+        HeapPermutationIterator::new(self)
     }
 }
 
@@ -4437,11 +5141,7 @@ impl<'a, T> Permutation<'a> for Vec<T> where T : 'a + Clone {
     type Permutator = HeapPermutationIterator<'a, T>;
 
     fn permutation(&'a mut self) -> HeapPermutationIterator<T> {
-        HeapPermutationIterator {
-            c : vec![0; self.len()],
-            data : self,
-            i : 0
-        }
+        HeapPermutationIterator::new(self)
     }
 }
 
@@ -4742,7 +5442,7 @@ fn create_k_set_sync<'a, T>(d : &'a[T], width : usize, result : &Arc<RwLock<Vec<
 /// map generated by Gospel's algorithm. The replacement is done in place.
 /// The function return `Some(())` to indicate that new combination replacement is done.
 /// If there's no further combination, it'll return `None`.
-fn swap_k<'a, 'b : 'a, T>(subset_map : (&'a mut [&'b T], &mut u128), d : &'b[T]) -> Option<()> {
+fn swap_k<'a, 'b : 'a, 'c : 'b, T : 'c>(subset_map : (&'a mut [&'b T], &mut u128), d : &'c[T]) -> Option<()> {
     // Replace original Gosper's algorithm by using enhanced version from Stanford University instead
     // if let Some(_) = gosper_combination(subset_map.1) {
     //     let mut copied_mask = *subset_map.1;
@@ -5185,17 +5885,18 @@ pub mod test {
     #[test]
     fn test_k_permutation() {
         use std::time::{Instant};
-        let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let data = [1, 2, 3, 4, 5];
+        let k = 3;
         let mut counter = 0;
         let timer = Instant::now();
-        k_permutation(&data, 8, |permuted| {
+        k_permutation(&data, k, |permuted| {
             // uncomment line below to print all k-permutation
-            // println!("{}:{:?}", counter, permuted);
+            println!("{}:{:?}", counter, permuted);
             counter += 1;
         });
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
-        assert_eq!(51891840, counter);
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
     }
 
     // #[test]
@@ -5279,7 +5980,7 @@ pub mod test {
         let mut counter = 1;
 
         for permutated in permutator {
-            // println!("{}:{:?}", counter, permutated);
+            println!("{}:{:?}", counter, permutated);
             counter += 1;
         }
 
@@ -5339,7 +6040,7 @@ pub mod test {
         let mut counter = 1;
 
         for _ in permutator {
-            // println!("{}:{:?}", counter, &*shared.borrow());
+            println!("{}:{:?}", counter, &*shared.borrow());
             counter += 1;
         }
 
@@ -5400,7 +6101,7 @@ pub mod test {
         let mut gosper = GosperCombinationCellIter::new(data, r, Rc::clone(&shared));
 
         for _ in gosper {
-            // println!("{}:{:?}", counter, combination);
+            // println!("{}:{:?}", counter, &*shared.borrow());
             counter += 1;
         }
 
@@ -5422,7 +6123,7 @@ pub mod test {
             let mut iter = gosper.into_iter();
 
             while let Some(_) = iter.next() {
-                // println!("{}:{:?}", counter, combination);
+                println!("{}:{:?}", counter, result);
                 counter += 1;
             }
 
@@ -5512,15 +6213,15 @@ pub mod test {
     fn test_KPermutation_into_Ref() {
         use std::time::Instant;
 
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let data : &[i32] = &[1, 2, 3, 4, 5];
         let mut counter = 0;
-        let k = 7;
+        let k = 3;
         let mut result : Vec<&i32> = vec![&data[0]; k];
         let shared = result.as_mut_slice() as *mut [&i32];
         let timer = Instant::now();
         unsafe {
             KPermutationRefIter::new(data, k, shared).into_iter().for_each(|_| {
-                // println!("{:?}", &*shared);
+                println!("{:?}", &*shared);
                 counter += 1;
             });
 
@@ -5533,9 +6234,9 @@ pub mod test {
     #[test]
     fn test_cartesian_product() {
         use std::time::Instant;
-        let set = (1..14).map(|item| item).collect::<Vec<u64>>();
+        let set = (1..4).map(|item| item).collect::<Vec<u64>>();
         let mut data = Vec::<&[u64]>::new();
-        for _ in 0..7 {
+        for _ in 0..4 {
             data.push(&set);
         }
 
@@ -6102,6 +6803,7 @@ pub mod test {
         }
     }
 
+    #[allow(unused)]
     #[test]
     fn test_unsafe_self_cartesian_product_shared_result() {
         use std::fmt::Debug;
@@ -6114,7 +6816,7 @@ pub mod test {
         }
         impl<'a, T : 'a + Debug> Consumer for Worker1<'a, T> {
             fn consume(&self) {
-                println!("Work1 has {:?}", self.data);
+                // println!("Work1 has {:?}", self.data);
             }
         }
         struct Worker2<'a, T : 'a> {
@@ -6122,16 +6824,22 @@ pub mod test {
         }
         impl<'a, T : 'a + Debug> Consumer for Worker2<'a, T> {
             fn consume(&self) {
-                println!("Work2 has {:?}", self.data);
+                // println!("Work2 has {:?}", self.data);
             }
         }
 
         unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [&'a i32], consumers : Vec<Box<Consumer + 'a>>) {
+            use std::time::Instant;
+            let timer = Instant::now();
+            let mut counter = 0;
             unsafe_self_cartesian_product(data, n, cur_result, || {
                 consumers.iter().for_each(|c| {
                     c.consume();
-                })
+                });
+                counter += 1;
             });
+
+            println!("start_cartesian_product_process: {} products in {:?}", counter, timer.elapsed());
         }
 
         let data : &[i32] = &[1, 2, 3];
@@ -6198,6 +6906,7 @@ pub mod test {
         start_cartesian_product_process(data, shared, consumers);
     }
     
+    #[allow(unused)]
     #[test]
     fn test_self_cartesian_product_shared_result_fn() {
         use std::fmt::Debug;
@@ -6356,10 +7065,9 @@ pub mod test {
 
     #[allow(non_snake_case)]
     #[test]
-    fn test_shared_CartesianProduct_result_sync_fn() {
-        let k = 7;
-        let data : &[&[i32]]= &[&[1, 2, 3], &[4, 5], &[6, 7, 8, 9, 10], &[11, 12, 13, 14, 15, 16]];
-        let result = vec![&data[0][0]; k];
+    fn test_shared_CartesianProduct_result_sync() {
+        let data : &[&[i32]]= &[&[1, 2, 3], &[4, 5], &[6, 7, 8, 9]];
+        let result = vec![&data[0][0]; data.len()];
         let result_sync = Arc::new(RwLock::new(result));
 
         // workter thread 1
@@ -6368,7 +7076,7 @@ pub mod test {
         thread::spawn(move || {
             while let Some(_) = t1_recv.recv().unwrap() {
                 let _result : &Vec<&i32> = &*t1_dat.read().unwrap();
-                // println!("Thread1: {:?}", _result);
+                println!("Thread1: {:?}", _result);
             }
             println!("Thread1 is done");
         });
@@ -6379,7 +7087,7 @@ pub mod test {
         thread::spawn(move || {
             while let Some(_) = t2_recv.recv().unwrap() {
                 let _result : &Vec<&i32> = &*t2_dat.read().unwrap();
-                // println!("Thread2: {:?}", _result);
+                println!("Thread2: {:?}", _result);
             }
             println!("Thread2 is done");
         });
@@ -6404,6 +7112,53 @@ pub mod test {
             });
 
             println!("Done {} products in {:?}", counter, timer.elapsed());
+        }).join().unwrap();
+    }
+
+    #[allow(non_snake_case)]
+    #[test]
+    fn test_share_CartesianProductIterator_result_to_thread() {
+        let data : &[&[i32]]= &[&[1, 2, 3], &[4, 5], &[6, 7, 8, 9]];
+
+        // workter thread 1
+        let (t1_send, t1_recv) = mpsc::channel::<Option<Vec<&i32>>>();
+        thread::spawn(move || {
+            while let Some(p) = t1_recv.recv().unwrap() {
+                println!("Thread1: {:?}", p);
+            }
+            println!("Thread1 is done");
+        });
+
+        // worker thread 2
+        let (t2_send, t2_recv) = mpsc::channel::<Option<Vec<&i32>>>();
+        thread::spawn(move || {
+            while let Some(p) = t2_recv.recv().unwrap() {
+                println!("Thread2: {:?}", p);
+            }
+            println!("Thread2 is done");
+        });
+
+        let consumers = vec![t1_send, t2_send];
+        // main thread that generate result
+        thread::spawn(move || {
+            use std::time::Instant;
+            let cart = CartesianProductIterator::new(data);
+            let mut counter = 0;
+            let timer = Instant::now();
+            
+            cart.into_iter().for_each(|p| {
+                println!("{:?}", p);
+                consumers.iter().for_each(|c| {
+                    c.send(Some(p.to_owned())).unwrap();
+                });
+                counter += 1;
+            });
+            
+            consumers.iter().for_each(|c| {
+                c.send(None).unwrap(); // Explicitly terminate all workers
+            });
+
+            println!("Main: Done {} products in {:?}", counter, timer.elapsed());
         }).join().unwrap();
     }
 
@@ -6556,6 +7311,7 @@ pub mod test {
         }
 
         println!("Total {} permutation done in {:?}", counter, timer.elapsed());
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
     }
 
     #[test]
@@ -6621,8 +7377,8 @@ pub mod test {
     #[allow(non_snake_case)]
     #[test]
     fn test_share_result_KPermutation_iterator_sync() {
-        let k = 5;
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let k = 3;
+        let data : &[i32] = &[1, 2, 3, 4, 5];
 
         // workter thread 1
         let (t1_send, t1_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
@@ -6630,7 +7386,7 @@ pub mod test {
         thread::spawn(move || {
             while let Some(c) = t1_recv.recv().unwrap() {
                 let _result : Vec<&i32> = c;
-                // println!("Thread1: {:?}", _result);
+                println!("Thread1: {:?}", _result);
             }
             println!("Thread1 is done");
         });
@@ -6640,7 +7396,7 @@ pub mod test {
         thread::spawn(move || {
             while let Some(c) = t2_recv.recv().unwrap() {
                 let _result : Vec<&i32> = c;
-                // println!("Thread2: {:?}", _result);
+                println!("Thread2: {:?}", _result);
             }
             println!("Thread2 is done");
         });
@@ -6659,6 +7415,7 @@ pub mod test {
             });
             channels.iter().for_each(|t| {t.send(None).unwrap()});
             println!("Done {} combinations in {:?}", counter, timer.elapsed());
+            assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
         }).join().unwrap();
     }
 
