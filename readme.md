@@ -1,5 +1,5 @@
 # Permutator
-It provides different way to get permutation of data.
+It provides multiple way to get permutation of data.
 ## TLDR
 Easiest generic use case
 ```Rust
@@ -10,11 +10,13 @@ domains.cart_prod().for_each(|cp| {
 
     // It's k-permutation of size 3 over data.
     cp.combination(3).for_each(|mut c| { // need mut
+        // each `c` is not &[&&i32]
         // print the first 3-combination over data
         println!("{:?}", c);
 
         // start permute the 3-combination
         c.permutation().for_each(|p| {
+            // each `p` is not &[&&&i32]
             // print each permutation of the 3-combination.
             println!("{:?}", p);
         });
@@ -24,6 +26,38 @@ domains.cart_prod().for_each(|cp| {
     })
 });
 ```
+Notice that each nested level get deeper reference.
+If such behavior is undesired, use `copy` module.
+Here's an example:
+```Rust
+use permutator::copy::{CartesianProduct, Combination, Permutation};
+let domains : &[&[i32]] = &[&[1, 2], &[3, 4, 5], &[6], &[7, 8], &[9, 10, 11]];
+domains.cart_prod().for_each(|cp| {
+    // each cp will be &[i32] with length equals to domains.len() which in this case 5
+
+    // It's k-permutation of size 3 over data.
+    cp.combination(3).for_each(|mut c| { // need mut
+        // each `c` is not &[i32]
+        // print the first 3-combination over data
+        println!("{:?}", c);
+
+        // start permute the 3-combination
+        c.permutation().for_each(|p| {
+            // each `p` is not &[i32]
+            // print each permutation of the 3-combination.
+            println!("{:?}", p);
+        });
+
+        // It'll print the last 3-permutation again because permutation permute the value in place.
+        println!("{:?}", c);
+    })
+});
+```
+## The `copy` module
+This crate split into two modules. One is root module which can be used in most of the case. Another is `copy` module which require that the type implement `Copy` trait. The root module always return value as a collection of `&T`, except all heap permutaiton family. The `copy` module always return value as a collection of `T`.
+### Note
+- All heap permutation functions are not in "copy" module because it's already do permutation in place.
+- All heap permutation iterators are also in "copy" module. This is because `K-Permutation` iterator family depends on `HeapPermutation` iterator family but `HeapPermutation` iterator family in root module doesn't require `T` to implement `Copy` trait while `K-Permutation` iterator family require `T` to implement `Copy` trait.
 ## Get a permutation at specific point, not an iterator style.
 It provides 2 functions to get a cartesian product or k-permutation:
 - get_cartesian_for
