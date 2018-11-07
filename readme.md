@@ -185,6 +185,8 @@ This crate provide 4 functions that serve different usecase.
 Struct like `CartesianProductIterator`, `CombinationIterator`, `HeapPermutationIterator`, `KPermutationIterator` return fresh new Vec on each iteration. All other structs that have other way to return value will return empty tuple on each iteration. For example, `CartesianProductCellIter`, `CombinationRefIter`, `HeapPermutationCellIter`, and `KPermutationRefIter` all return empty tuple on each iteration. It return result via parameter specified when instantiate an object. For example, method `new` on `CartesianProductCellIter` require Rc<RefCell<&mut [&T]>> parameter which will be used to store each cartesian product from each iteration.
 It's important to keep in mind that these struct with suffix `RefIter` and `CellIter` **overwrite** the result of previous iteration on every iteration. If every result from each iteration need to be kept, consider using non-suffix version. For example, instead of using `KPermutationRefIter` and clone/copy every result into Vec, consider using `KPermutationIterator` instead.
 ### Performance concern
+- For primitive data type, module `copy` and root module performance is roughly equivalent.
+- For complex data type, module `copy` performance will depend on the implementation of `Copy` trait.
 - Generally speaking, the standard callback function give highest throughput but the return result is a borrowed data with lifetime valid only in that callback scope.
 - The crate provides three built-in methods to share result.
     1. callback function with "_cell" suffix.
