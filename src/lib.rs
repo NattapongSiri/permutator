@@ -7333,6 +7333,20 @@ pub mod test {
     }
 
     #[test]
+    fn test_combination_fn_single() {
+        let data = [1];
+        let r = 1;
+        let mut counter = 0;
+
+        combination(&data, r, |comb| {
+            println!("{:?}", comb);
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
+    }
+
+    #[test]
     fn test_combination_fn_bound() {
         let data = [1, 2, 3];
         let r = 3;
