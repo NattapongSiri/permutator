@@ -1,7 +1,7 @@
 [package]
 name = "permutator"
 categories = ["algorithms"]
-description = "Get a lexicographic cartesian product and lexicographic permutation at any specific index from data. Generate complete lexicographic cartesian product from multiple set of data. Generate complete non-lexicographic combination from data. Generate non-lexicographic k-permutation."
+description = "Get a lexicographic cartesian product and lexicographic permutation at any specific index from data. Generate complete lexicographic cartesian product from single or multiple set of data. Generate complete lexicographic combination from data. Generate non-lexicographic permutation and k-permutation."
 documentation = "https://docs.rs/permutator/0.2.3/"
 keywords = ["cartesian", "permutation", "combination", "multiple", "k-permutation"]
 license = "BSD-3-Clause"

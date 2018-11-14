@@ -28,6 +28,11 @@
 //! then create another Vec that hold usize pointed to each
 //! element in prior Vec. Now we have a Vec that store primitive 
 //! type thust can be used in this module.
+//! Another way to do the same thing but doesn't have an indirection
+//! like `actual_data[pointers[i]]` to access data is to create
+//! a `Vec<&T>` and every element in this Vec is just a ref to
+//! another element in Vec<T>. Now, to access data, it's `ref_vec[i]`.
+//! The only restriction with later approach is `T` must be sized.
 //! 
 //! Note: All Iterator that return an owned item
 //! still return the same owned item, e.g. Vec<T>
@@ -3380,7 +3385,6 @@ impl<'a, T> ExactSizeIterator for HeapPermutationRefIter<'a, T> where T : Copy {
 /// Vec<T> to `*mut [T]` then perform `&mut *` on it.
 /// 
 /// # See
-/// - [GosperCombination](struct.GoserPermutation.html)
 /// - [HeapPermutation](struct.HeapPermutationIterator.html)
 pub struct KPermutationIterator<'a, T> where T : 'a + Copy {
     permuted : Vec<T>,
@@ -3492,11 +3496,6 @@ impl<'a, T> ExactSizeIterator for KPermutationIterator<'a, T> where T : 'a + Cop
 ///    assert_eq!(60, counter);
 /// ```
 /// 
-/// # Limitation
-/// Gosper algorithm need to know the MSB (most significant bit).
-/// The current largest known MSB data type is u128.
-/// This make the implementation support up to 128 elements slice.
-/// 
 /// # Notes
 /// This struct manual iteration performance is about 110% slower than using 
 /// [k-permutation](fn.k_permutation.html) function
@@ -3515,7 +3514,6 @@ impl<'a, T> ExactSizeIterator for KPermutationIterator<'a, T> where T : 'a + Cop
 /// which will hurt performance.
 /// 
 /// # See
-/// - [GosperCombination](struct.GoserPermutation.html)
 /// - [HeapPermutation](struct.HeapPermutationIterator.html)
 pub struct KPermutationCellIter<'a, T> where T : 'a + Copy {
     permuted : Rc<RefCell<&'a mut [T]>>,
@@ -3607,10 +3605,10 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> where T : 'a + Cop
 /// *mut [&T]>> parameter to 
 /// [new method of KPermutationRefIter](struct.KPermutationRefIter.html#method.new).
 /// 
-/// # Unsafe
-/// This object took raw mutable pointer and convert in upon object
-/// instantiation via [new function](struct.KPermutationRefIter.html#method.new)
-/// thus all unsafe Rust conditions will be applied on all method.
+/// # Safety
+/// This object use raw mutable pointer provided from user and keep using it
+/// in each `next` iteration. Therefore, all raw pointer conditions are applied
+/// up until this object is dropped.
 /// 
 /// # Rationale
 /// It uses unsafe to take a mutable pointer to store the result
@@ -3647,11 +3645,6 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> where T : 'a + Cop
 ///    assert_eq!(60, counter);
 /// ```
 /// 
-/// # Limitation
-/// Gosper algorithm need to know the MSB (most significant bit).
-/// The current largest known MSB data type is u128.
-/// This make the implementation support up to 128 elements slice.
-/// 
 /// # Notes
 /// This struct manual iteration performance is about 110% slower than using 
 /// [k-permutation](fn.k_permutation.html) function
@@ -3661,7 +3654,6 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> where T : 'a + Cop
 /// need to be run from start to finish only.
 /// 
 /// # See
-/// - [GosperCombination](struct.GoserPermutation.html)
 /// - [HeapPermutation](struct.HeapPermutationIterator.html)
 pub struct KPermutationRefIter<'a, T> where T : 'a + Copy {
     permuted : *mut [T],
@@ -5567,14 +5559,13 @@ pub mod test {
 
         let mut counter = 0;
 
-        unsafe {
-            (data, k, result_ptr).permutation().for_each(|_| {
-                println!("{:?}", result);
-                counter += 1;
-            });
+        // warning ! it hide all unsafe but all unsafe is still applied
+        (data, k, result_ptr).permutation().for_each(|_| {
+            println!("{:?}", result);
+            counter += 1;
+        });
 
-            assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
-        }
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
     }
 
     #[allow(non_snake_case)]

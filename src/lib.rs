@@ -2088,6 +2088,7 @@ pub fn heap_permutation_sync<T>(d : &Arc<RwLock<Vec<T>>>, cb : impl FnMut() -> (
 /// 2. `n` - The total length of data
 /// 3. `swap_fn` - The closure that perform data swap
 /// 4. `cb` - The callback function that will return each permutation.
+#[allow(unused)]
 macro_rules! _k_permutation_core {
     ($k : expr, $n : expr, $swap_fn : expr, $permute_fn : expr, $cb : expr) => {
         if $n < $k {
@@ -4780,12 +4781,7 @@ impl<'a, T> ExactSizeIterator for KPermutationIterator<'a, T> {
 ///    println!("Total {} permutations done in {:?}", counter, timer.elapsed());
 ///    assert_eq!(60, counter);
 /// ```
-/// 
-/// # Limitation
-/// Gosper algorithm need to know the MSB (most significant bit).
-/// The current largest known MSB data type is u128.
-/// This make the implementation support up to 128 elements slice.
-/// 
+///
 /// # Notes
 /// This struct manual iteration performance is about 110% slower than using 
 /// [k-permutation](fn.k_permutation.html) function
@@ -4804,7 +4800,6 @@ impl<'a, T> ExactSizeIterator for KPermutationIterator<'a, T> {
 /// which will hurt performance.
 /// 
 /// # See
-/// - [GosperCombination](struct.GoserPermutation.html)
 /// - [HeapPermutation](struct.HeapPermutationIterator.html)
 pub struct KPermutationCellIter<'a, T> where T : 'a {
     permuted : Rc<RefCell<&'a mut [&'a T]>>,
@@ -4947,10 +4942,10 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> {
 /// *mut [&T]>> parameter to 
 /// [new method of KPermutationRefIter](struct.KPermutationRefIter.html#method.new).
 /// 
-/// # Unsafe
-/// This object took raw mutable pointer and convert in upon object
-/// instantiation via [new function](struct.KPermutationRefIter.html#method.new)
-/// thus all unsafe Rust conditions will be applied on all method.
+/// # Safety
+/// This object use raw mutable pointer provided from user and keep using it
+/// in each `next` iteration. Therefore, all raw pointer conditions are applied
+/// up until this object is dropped.
 /// 
 /// # Rationale
 /// It uses unsafe to take a mutable pointer to store the result
@@ -4987,11 +4982,6 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> {
 ///    assert_eq!(60, counter);
 /// ```
 /// 
-/// # Limitation
-/// Gosper algorithm need to know the MSB (most significant bit).
-/// The current largest known MSB data type is u128.
-/// This make the implementation support up to 128 elements slice.
-/// 
 /// # Notes
 /// This struct manual iteration performance is about 110% slower than using 
 /// [k-permutation](fn.k_permutation.html) function
@@ -5001,7 +4991,6 @@ impl<'a, T> ExactSizeIterator for KPermutationCellIter<'a, T> {
 /// need to be run from start to finish only.
 /// 
 /// # See
-/// - [GosperCombination](struct.GoserPermutation.html)
 /// - [HeapPermutation](struct.HeapPermutationIterator.html)
 pub struct KPermutationRefIter<'a, T> where T : 'a {
     permuted : *mut [&'a T],
@@ -5013,7 +5002,7 @@ pub struct KPermutationRefIter<'a, T> where T : 'a {
 }
 
 impl<'a, T> KPermutationRefIter<'a, T> {
-    pub fn new(data : &'a [T], k : usize, result : *mut [&'a T]) -> KPermutationRefIter<'a, T> {
+    pub unsafe fn new(data : &'a [T], k : usize, result : *mut [&'a T]) -> KPermutationRefIter<'a, T> {
         let combinator = LargeCombinationIterator::new(data, k);
         let n = data.len();
 
@@ -7269,7 +7258,7 @@ pub mod test {
     fn test_KPermutation_trait() {
         let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
         let mut counter = 0;
-        (&*data, 3usize).permutation().for_each(|p| {
+        (&*data, 3usize).permutation().for_each(|_p| {
             // println!("{:?}", p);
             counter += 1;
         });
@@ -7297,7 +7286,7 @@ pub mod test {
         assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
     }
 
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, unused_unsafe)]
     #[test]
     fn test_KPermutation_into_Ref_trait() {
         use std::time::Instant;
@@ -7332,6 +7321,20 @@ pub mod test {
     #[test]
     fn test_combination_fn() {
         let data = [1, 2, 3, 4, 5];
+        let r = 3;
+        let mut counter = 0;
+
+        combination(&data, r, |comb| {
+            println!("{:?}", comb);
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
+    }
+
+    #[test]
+    fn test_combination_fn_bound() {
+        let data = [1, 2, 3];
         let r = 3;
         let mut counter = 0;
 
@@ -8497,5 +8500,18 @@ pub mod test {
             lc.iter().for_each(|_c| {counter += 1});
             println!("Custom comb {} combination done in {:?}", counter, timer.elapsed());
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_heap_fn() {
+        use std::time::Instant;
+        let mut data : Vec<i32> = (0..13i32).map(|i| {i}).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        heap_permutation(data.as_mut_slice(), |p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
     }
 }
