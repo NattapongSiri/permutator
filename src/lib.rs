@@ -4558,7 +4558,6 @@ where T : Iterator<Item=V> + 'a,
 
             if let Some(_) = perm.next() {
                 // get next permutation of current permutator
-                println!("Get result");
                 return Some(());
             } 
         } 
