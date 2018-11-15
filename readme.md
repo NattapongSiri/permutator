@@ -731,13 +731,24 @@ inside the buffer. The sender will block until the receiver read the data.
         start_k_permutation_process(data, result_sync, k, vec![t1_send, t2_send], main_recv);
     }).join().unwrap();
 ```
-## Major change from 0.2.2 to 0.2.3
+## Breaking change from 0.2.2 to 0.2.3
+`combination` from root module and `copy` module now return "Large" combination family.
+### Rationale
 All "Gosper" combination family is supersede by "Large" combination family. It doesn't mark those family deprecated yet. There's only Rust document that state it being deprecated. This is because the reason for being deprecated is that the implementation in this crate is inefficient. Each time that gosper algorithm generate new value, it copied all value or create new ref for that combination. In contrast to "Large" family that only copy or create new ref when the combination at that position changed. This make "Large" family combination faster over 10 times. So unless more efficient implementation is available, after sometime, the "Gosper" family function may officially mark deprecated. There's also "Gosper" combination family limitation that it can generate combination as many as bits of variable that support fast bit operation, which Rust currently is capped to 128 bits so source be as large as 128 elements slice. In practical, this is more than enough on most case. But in some edge case, "Large" combination family permit a combination on data as many as `usize` max value, which is 2^32 on 32 bits platform and 2^64 on 64 bits platform. The result from "Large" combination family is lexicographic ordered if the source is lexicographic ordered.
 
-K-permutation family are all migrated to use "Large" combination family instead of "Gosper" family. 
+Internally, k-permutation family are all migrated to use "Large" combination family instead of "Gosper" family.
 ## Migration guide from 0.2.2 to 0.2.3
 - `combination*` functions become `large_combination*` functions.
 - `GosperCombination*` structs become `LargeCombination*` structs.
+For example:
+```Rust
+    // This line will be error in 0.3.0
+    let combinations : GosperCombinationIterator = [1, 2, 3, 4, 5].combination(3);
+```
+Become
+```Rust
+    let combinations : LargeCombinationIterator = [1, 2, 3, 4, 5].combination(3);
+```
 ## Breaking change from 0.1.6 to 0.2.0
 Version 0.2.0 has major overhaul on entire crate to make use case more consistent on each other functionalities. There are now only 2 major distinct styles. 1. Callback function 2. Iterator object. The Iterator object has 2 sub-style. 1. Plain `Iterator` style. 2. Shared `Iterator` style. The shared `Iterator` style has both safe and unsafe kind of share which is similar to callback style counterpart. It need to rename every structs. It add one more trait and some more types.
 More detail on breaking change:
