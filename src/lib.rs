@@ -1754,7 +1754,7 @@ pub fn large_combination<'a, T, F>(domain: &'a [T], r : usize, mut cb : F)
 }
 
 /// Generate a r-combination from given domain and call callback function
-/// on each combination.
+/// on each combination. The result will be return into ref mut pointer.
 /// 
 /// # Parameter
 /// 1. `domain : &[T]` - A slice contain a domain to generate r-combination
@@ -1802,7 +1802,7 @@ pub unsafe fn unsafe_large_combination<'a, T : 'a>(domain: &'a [T], r : usize, r
 }
 
 /// Generate a r-combination from given domain and call callback function
-/// on each combination.
+/// on each combination. The result will be return into Rc<RefCell<>>.
 /// 
 /// # Parameter
 /// 1. `domain : &[T]` - A slice contain a domain to generate r-combination
@@ -1842,7 +1842,7 @@ pub fn large_combination_cell<'a, T : 'a>(domain: &'a[T], r : usize, result : Rc
 }
 
 /// Generate a r-combination from given domain and call callback function
-/// on each combination.
+/// on each combination. The result will be return into Arc<RwLock<>>.
 /// 
 /// # Parameter
 /// 1. `domain : &[T]` - A slice contain a domain to generate r-combination
@@ -3799,7 +3799,6 @@ fn _large_comb_next_core<'a, T, R, V>(
 
 /// Create a combination iterator.
 /// The result is lexicographic ordered if input is lexicorgraphic ordered.
-/// 
 /// The returned combination will be a reference into given data.
 /// Each combination return from iterator will be a new Vec.
 /// It's safe to hold onto a combination or `collect` it.
@@ -3895,7 +3894,6 @@ impl<'a, T> ExactSizeIterator for LargeCombinationIterator<'a, T> {
 
 /// Create a combination iterator.
 /// The result is lexicographic ordered if input is lexicorgraphic ordered.
-/// 
 /// The returned combination will be a reference into given data.
 /// Each combination return from iterator is stored into given
 /// Rc<RefCell<&mut [&T]>>.
@@ -4002,7 +4000,6 @@ impl<'a, T> ExactSizeIterator for LargeCombinationCellIter<'a, T> {
 
 /// Create an unsafe combination iterator that return result to mutable pointer.
 /// The result is lexicographic ordered if input is lexicorgraphic ordered.
-/// 
 /// The returned combination will be a reference into given data.
 /// Each combination return from iterator is stored into given
 /// *mut [&T].
