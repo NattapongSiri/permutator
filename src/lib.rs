@@ -3291,6 +3291,8 @@ impl<'a, T> IntoIterator for GosperCombinationIterator<'a, T> {
     }
 }
 
+/// # Deprecated
+/// 
 /// An iterator return from [struct GosperCombination](struct.GosperCombinationIterator.html)
 /// or from [trait Combination](trait.Combination.html) over slice or vec of data.
 pub struct CombinationIterator<'a, T> where T : 'a {
@@ -3454,6 +3456,8 @@ impl<'a, T> IntoIterator for GosperCombinationCellIter<'a, T> {
     }
 }
 
+/// # Deprecated
+/// 
 /// An iterator return from [struct GosperCombination](struct.GosperCombinationIterator.html)
 /// or from [trait Combination](trait.Combination.html) over slice or vec of data.
 pub struct CombinationCellIter<'a, T> where T : 'a {
@@ -3637,6 +3641,8 @@ impl<'a, T> IntoIterator for GosperCombinationRefIter<'a, T> {
     }
 }
 
+/// # Deprecated
+/// 
 /// An iterator return from [struct GosperCombination](struct.GosperCombinationIterator.html)
 /// or from [trait Combination](trait.Combination.html) over slice or vec of data.
 pub struct CombinationRefIter<'a, T> where T : 'a {
@@ -5781,44 +5787,33 @@ impl<'a, 'b : 'a, T> CartesianProduct<'a> for SelfCartesianProductIntoRefParams<
 pub trait Combination<'a> {
     type Combinator : Iterator;
 
-    /// Create a [CombinationIterator](struct.CombinationIterator.html)
+    /// Create a family of [LargeCombinationIterator](struct.LargeCombinationIterator.html)
     /// of `k` size out of `self`.
-    /// See [CombinationIterator](struct.CombinationIterator.html) for
-    /// how to use [CombinationIterator](struct.CombinationIterator.html)
+    /// See [LargeCombinationIterator](struct.LargeCombinationIterator.html) for
+    /// how to use [LargeCombinationIterator](struct.LargeCombinationIterator.html)
     /// 
     /// # Return
-    /// A new [CombinationIterator<T>](struct.CombinationIterator.html)
+    /// A new family of [LargeCombinationIterator<T>](struct.LargeCombinationIterator.html)
     fn combination(&'a self, k : usize) -> Self::Combinator;
 }
 
+/// An implementation for convenient use of [LargeCombinationIterator](struct.LargeCombinationIterator.html)
 impl<'a, T> Combination<'a> for [T] where T : 'a {
-    type Combinator = CombinationIterator<'a, T>;
+    type Combinator = LargeCombinationIterator<'a, T>;
 
-    fn combination(&'a self, k : usize) -> CombinationIterator<'a, T> {
-        let mut x : u128 = 1;
-        x <<= k;
-        x -= 1;
+    fn combination(&'a self, k : usize) -> LargeCombinationIterator<'a, T> {
 
-        CombinationIterator {
-            data : self,
-            r : k,
-            x : x
-        }
+        LargeCombinationIterator::new(self, k)
     }
 }
 
+/// An implementation for convenient use of [LargeCombinationIterator](struct.LargeCombinationIterator.html)
 impl<'a, T> Combination<'a> for Vec<T> where T : 'a {
-    type Combinator = CombinationIterator<'a, T>;
+    type Combinator = LargeCombinationIterator<'a, T>;
 
-    fn combination(&'a self, k : usize) -> CombinationIterator<'a, T> {
-        let mut x : u128 = 1;
-        x = (x << k) - 1;
+    fn combination(&'a self, k : usize) -> LargeCombinationIterator<'a, T> {
         
-        CombinationIterator {
-            data : self,
-            r : k,
-            x : x
-        }
+        LargeCombinationIterator::new(self, k)
     }
 }
 
@@ -5836,17 +5831,12 @@ impl<'a, T> Combination<'a> for Vec<T> where T : 'a {
 /// It's a sink to temporary store each combination.
 pub type CombinationIntoCellParams<'a, T> = (&'a [T], Rc<RefCell<&'a mut[&'a T]>>);
 
+/// An implementation for convenient use of [LargeCombinationCellIter](struct.LargeCombinationCellIter.html)
 impl<'a, 'b : 'a, T> Combination<'a> for CombinationIntoCellParams<'b, T> {
-    type Combinator = CombinationCellIter<'b, T>;
+    type Combinator = LargeCombinationCellIter<'b, T>;
 
-    fn combination(&'a self, k : usize) -> CombinationCellIter<'b, T> {
-        let x = (1 << k) - 1;
-        CombinationCellIter {
-            data : self.0,
-            r : k,
-            result : Rc::clone(&self.1),
-            x : x
-        }
+    fn combination(&'a self, k : usize) -> LargeCombinationCellIter<'b, T> {
+        LargeCombinationCellIter::new(self.0, k, Rc::clone(&self.1))
     }
 }
 
@@ -5864,23 +5854,17 @@ impl<'a, 'b : 'a, T> Combination<'a> for CombinationIntoCellParams<'b, T> {
 /// It's a result container. 
 pub type CombinationIntoRefParams<'a, T> = (&'a [T], * mut[&'a T]);
 
-/// An implementation for convenient use of [GosperCombinationRefIter](struct.GosperCombinationRefIter.html)
+/// An implementation for convenient use of [LargeCombinationRefIter](struct.LargeCombinationRefIter.html)
 /// # Warning
-/// It hid unsafe object instantiation of [GosperCombinationRefIter](struct.GosperCombinationRefIter.html#method.new)
+/// It hid unsafe object instantiation of [LargeCombinationRefIter](struct.LargeCombinationRefIter.html#method.new)
 /// from user but all unsafe conditions are still applied as long as
 /// the life of object itself.
 impl<'a, 'b : 'a, T> Combination<'a> for CombinationIntoRefParams<'b, T> {
-    type Combinator = CombinationRefIter<'b, T>;
+    type Combinator = LargeCombinationRefIter<'b, T>;
 
-    fn combination(&'a self, k : usize) -> CombinationRefIter<'b, T> {
-        let x = (1 << k) - 1;
+    fn combination(&'a self, k : usize) -> LargeCombinationRefIter<'b, T> {
         unsafe {
-            CombinationRefIter {
-                data : self.0,
-                r : k,
-                result : &mut *self.1,
-                x : x
-            }
+            LargeCombinationRefIter::new(self.0, k, self.1)
         }
     }
 }
