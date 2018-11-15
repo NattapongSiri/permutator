@@ -101,6 +101,9 @@
 //! ```
 //! # See
 //! - [Github repository for more examples](https://github.com/NattapongSiri/permutator)
+//! 
+//! # Found a bug ?
+//! Open issue at [Github](https://github.com/NattapongSiri/permutator)
 
 extern crate num;
 
