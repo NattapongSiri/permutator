@@ -6564,7 +6564,7 @@ pub mod test {
     #[test]
     fn test_CartesianProduct_mimic_iterator() {
         use std::time::Instant;
-        let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];
+        let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,]];
         let mut result : Vec<&usize> = vec![&data[0][0]; data.len()];
         unsafe {
             let mut cart = CartesianProductRefIter::new(&data, result.as_mut_slice());
@@ -6629,7 +6629,7 @@ pub mod test {
     #[test]
     fn test_CartesianProduct_mimic_iterator_2() {
         use std::time::Instant;
-        let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];
+        let data : &[&[usize]] = &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,]];
         let mut result : Vec<&usize> = vec![&data[0][0]; data.len()];
         unsafe {
             let mut cart = CartesianProductRefIter::new(&data, result.as_mut_slice() as *mut [&usize]);
@@ -6670,7 +6670,7 @@ pub mod test {
         
         let mut counter = 0;
         let timer = Instant::now();
-        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];;
+        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,]];;
         let mut result = vec![&data[0][0]; data.len()];
         let shared = Rc::new(RefCell::new(result.as_mut_slice()));
 
@@ -6689,7 +6689,7 @@ pub mod test {
         
         let mut counter = 0;
         let timer = Instant::now();
-        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];;
+        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,]];;
         let mut result = vec![&data[0][0]; data.len()];
         let shared = result.as_mut_slice() as *mut [&u8];
 
@@ -6721,6 +6721,7 @@ pub mod test {
 
     #[allow(unused)]
     #[test]
+    #[ignore]
     fn test_large_k_permutation() {
         use std::time::{Instant};
         let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
@@ -6947,8 +6948,8 @@ pub mod test {
     #[test]
     fn test_GosperCombinationIteratorUnsafe() {
         use std::time::{Instant};
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let r = 3;
+        let data = &[1, 2, 3, 4, 5, 6];
+        let r = 4;
         let mut counter = 0;
         let timer = Instant::now();
         let mut result = vec![&data[0]; r];
@@ -6969,7 +6970,7 @@ pub mod test {
     #[test]
     fn test_GosperCombinationCellIter() {
         use std::time::{Instant};
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let data = &[1, 2, 3, 4, 5, 6];
         let r = 3;
         let mut counter = 0;
         let timer = Instant::now();
@@ -7071,9 +7072,9 @@ pub mod test {
     fn test_KPermutation_into_Cell() {
         use std::time::Instant;
 
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let data : &[i32] = &[1, 2, 3, 4, 5];
         let mut counter = 0;
-        let k = 7;
+        let k = 3;
         let mut result : Vec<&i32> = vec![&data[0]; k];
         let shared = Rc::new(RefCell::new(result.as_mut_slice()));
         let timer = Instant::now();
@@ -7150,7 +7151,7 @@ pub mod test {
     #[test]
     fn test_combination_trait() {
         let data = [1, 2, 3, 4, 5, 6, 7, 8];
-        let k = 3;
+        let k = 4;
         let mut counter = 0;
         for combination in data.combination(k) {
             println!("{:?}", combination);
@@ -7178,8 +7179,8 @@ pub mod test {
 
     #[test]
     fn test_combination_trait_ptr() {
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8];
-        let k = 3;
+        let data : &[i32] = &[1, 2, 3, 4, 5, 6];
+        let k = 4;
         let mut result = vec![&data[0]; k];
         let shared = result.as_mut_slice() as *mut [&i32];
         let combination_op = (data, shared);
@@ -7237,7 +7238,7 @@ pub mod test {
 
     #[test]
     fn test_k_permutation_primitive() {
-        let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let data = [1, 2, 3, 4, 5];
         let k = 3;
         let mut counter = 0;
 
@@ -7271,9 +7272,9 @@ pub mod test {
     fn test_KPermutation_into_cell_trait() {
         use std::time::Instant;
 
-        let data : &mut[i32] = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let data : &mut[i32] = &mut [1, 2, 3, 4, 5, 6];
         let mut counter = 0;
-        let k = 7;
+        let k = 2;
         let mut result : Vec<&i32> = vec![&data[0]; k];
         let shared = Rc::new(RefCell::new(result.as_mut_slice()));
         let timer = Instant::now();
@@ -7478,8 +7479,8 @@ pub mod test {
             });
             println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
         }
-        let k = 8;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 5;
+        let data = &[1, 2, 3, 4, 5, 6];
         let mut result = vec![&data[0]; k];
 
         unsafe {
@@ -7536,8 +7537,8 @@ pub mod test {
             });
             println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
         }
-        let k = 7;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 4;
+        let data = &[1, 2, 3, 4, 5, 6, 7];
         let mut result = vec![&data[0]; k];
         let result_cell = Rc::new(RefCell::new(result.as_mut_slice()));
 
@@ -7573,8 +7574,8 @@ pub mod test {
 
             println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
         }
-        let k = 7;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 4;
+        let data = &[1, 2, 3, 4, 5, 6];
         let result = vec![&data[0]; k];
         let result_sync = Arc::new(RwLock::new(result));
 
@@ -7614,8 +7615,8 @@ pub mod test {
     #[allow(non_snake_case)]
     #[test]
     fn test_share_result_CombinationIterator_with_thread_fn() {
-        let k = 7;
-        let data : &[i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 3;
+        let data : &[i32] = &[1, 2, 3, 4, 5];
 
         // workter thread 1
         let (t1_send, t1_recv) = mpsc::sync_channel::<Option<Vec<&i32>>>(0);
@@ -7682,8 +7683,8 @@ pub mod test {
                 result.iter().for_each(|_| {});
             }
         }
-        let k = 7;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let k = 4;
+        let data = &[1, 2, 3, 4, 5, 6, 7];
         let mut result = vec![&data[0]; k];
         let result_cell = Rc::new(RefCell::new(result.as_mut_slice()));
 
@@ -7977,8 +7978,8 @@ pub mod test {
 
             println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
         }
-        let k = 7;
-        let data : &[&[i32]]= &[&[1, 2, 3], &[4, 5], &[6, 7, 8, 9, 10], &[11, 12, 13, 14, 15, 16]];
+        let k = 3;
+        let data : &[&[i32]]= &[&[1, 2, 3], &[4, 5], &[6, 7, 8, 9, 10]];
         let result = vec![&data[0][0]; k];
         let result_sync = Arc::new(RwLock::new(result));
 
@@ -8288,8 +8289,8 @@ pub mod test {
 
             println!("Done {} combinations with 2 workers in {:?}", counter, timer.elapsed());
         }
-        let k = 5;
-        let data = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let k = 4;
+        let data = &[1, 2, 3, 4, 5, 6];
         let result = vec![&data[0]; k];
         let result_sync = Arc::new(RwLock::new(result));
 
@@ -8374,9 +8375,9 @@ pub mod test {
     #[test]
     fn test_unsafe_cartesian_product() {
         use std::time::Instant;
-        let set = (1..14).map(|item| item).collect::<Vec<u64>>();
+        let set = (1..4).map(|item| item).collect::<Vec<u64>>();
         let mut data = Vec::<&[u64]>::new();
-        for _ in 0..7 {
+        for _ in 0..3 {
             data.push(&set);
         }
 
@@ -8399,8 +8400,8 @@ pub mod test {
     #[test]
     fn test_unsafe_k_permutation() {
         use std::time::{Instant};
-        let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-        let k = 11;
+        let data = [1, 2, 3, 4, 5];
+        let k = 3;
         let mut counter = 0;
         let mut result = vec![&data[0]; k];
         let timer = Instant::now();
@@ -8520,11 +8521,80 @@ pub mod test {
     #[ignore]
     fn bench_heap_fn() {
         use std::time::Instant;
-        let mut data : Vec<i32> = (0..13i32).map(|i| {i}).collect();
+        let mut data : Vec<i32> = (0..10i32).map(|i| {i}).collect();
         let timer = Instant::now();
         let mut counter = 0;
 
-        heap_permutation(data.as_mut_slice(), |p| {counter += 1});
+        heap_permutation(data.as_mut_slice(), |_p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_heap_iter() {
+        use std::time::Instant;
+        let mut data : Vec<i32> = (0..10i32).map(|i| {i}).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        data.permutation().for_each(|_p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_k_perm_fn() {
+        use std::time::Instant;
+
+        let data : Vec<i32> = (0..13i32).map(|i| {i}).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        k_permutation(data.as_slice(), 7, |_p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_k_perm_iter() {
+        use std::time::Instant;
+
+        let data : Vec<i32> = (0..13i32).map(|i| {i}).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        (data.as_slice(), 7usize).permutation().for_each(|_p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_cart_fn() {
+        use std::time::Instant;
+        let domain : Vec<i32> = (0..5i32).map(|i| {i}).collect();
+        let domains : Vec<&[i32]> = (0..10).map(|_| domain.as_slice()).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        cartesian_product(domains.as_slice(), |_p| {counter += 1});
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_cart_iter() {
+        use std::time::Instant;
+        let domain : Vec<i32> = (0..5i32).map(|i| {i}).collect();
+        let domains : Vec<&[i32]> = (0..10).map(|_| domain.as_slice()).collect();
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        domains.as_slice().cart_prod().for_each(|_p| {counter += 1});
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
     }
