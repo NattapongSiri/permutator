@@ -2763,6 +2763,7 @@ pub struct LargeCombinationIterator<'a, T> where T : 'a + Copy {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
     result : Vec<T>, // result container
@@ -2781,6 +2782,7 @@ impl<'a, T> LargeCombinationIterator<'a, T> where T : 'a + Copy {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
             result : result
@@ -2800,6 +2802,7 @@ impl<'a, T> Iterator for LargeCombinationIterator<'a, T> where T : 'a + Copy {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -2814,6 +2817,7 @@ impl<'a, T> Iterator for LargeCombinationIterator<'a, T> where T : 'a + Copy {
 
 impl<'a, T> IteratorReset for LargeCombinationIterator<'a, T> where T : 'a + Copy {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }
@@ -2869,6 +2873,7 @@ pub struct LargeCombinationCellIter<'a, T> where T : 'a + Copy {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
 
@@ -2887,6 +2892,7 @@ impl<'a, T> LargeCombinationCellIter<'a, T> where T : 'a + Copy {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
 
@@ -2907,6 +2913,7 @@ impl<'a, T> Iterator for LargeCombinationCellIter<'a, T> where T : 'a + Copy {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -2921,6 +2928,7 @@ impl<'a, T> Iterator for LargeCombinationCellIter<'a, T> where T : 'a + Copy {
 
 impl<'a, T> IteratorReset for LargeCombinationCellIter<'a, T> where T : 'a + Copy {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }
@@ -2988,6 +2996,7 @@ pub struct LargeCombinationRefIter<'a, T> where T : 'a + Copy {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
 
@@ -3006,6 +3015,7 @@ impl<'a, T> LargeCombinationRefIter<'a, T> where T : 'a + Copy {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
 
@@ -3032,6 +3042,7 @@ impl<'a, T> Iterator for LargeCombinationRefIter<'a, T> where T : 'a + Copy {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -3046,6 +3057,7 @@ impl<'a, T> Iterator for LargeCombinationRefIter<'a, T> where T : 'a + Copy {
 
 impl<'a, T> IteratorReset for LargeCombinationRefIter<'a, T> where T : 'a + Copy {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }

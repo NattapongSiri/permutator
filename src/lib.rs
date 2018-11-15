@@ -3708,17 +3708,24 @@ impl<'a, T> ExactSizeIterator for CombinationRefIter<'a, T> {
     }
 }
 
-/// A core logic of `next` function of `GosperCombination` iterator family.
+/// A core logic of `next` function of `LargeCombination` iterator family.
 /// 
 /// # Parameters
-/// 1. `map` - a ref mut pointed to gosper map
-/// 2. `into_result` - closure that take two usizes. First usize is
-/// incremented on each call by 1. Second usize is index of which
-/// data that is mapped by gosper's map.
+/// 1. `c` - a ref mut slice to usize. It's current cursor state in iterator
+/// 2. `data` - a ref slice to data to get a combination from.
+/// 3. `iterated` - A ref mut to empty Option. If none, it mean this is first call
+/// to the function.
+/// 4. `r` - A size of combination
+/// 5. `result` - A ref mut to result container
+/// 6. `result_change_fn` - A closure that accept parameter `usize`, `usize`, and `&mut R`.
+/// It responsible to assign a new value to R. The first usize is a slot of R 
+/// to be updated. The second usize is the index to `data`.
+/// 7. `result_fn` - A function that make result ready for comsumption.
 #[inline(always)]
 fn _large_comb_next_core<'a, T, R, V>(
     c : &mut [usize], 
     data : & [T],
+    iterated : &mut Option<()>,
     r : usize,
     result : &mut R,
     mut result_change_fn : impl FnMut(usize, usize, &mut R),
@@ -3767,9 +3774,7 @@ fn _large_comb_next_core<'a, T, R, V>(
     }
     
     /// Init first result.
-    /// Subsequence call to this function will immediately return
-    /// until the iter is reset then this function will run once
-    /// again.
+    /// It'd be call only once to populate the result
     #[inline(always)]
     fn init_once<'a, F, R>(
         c : &mut [usize], 
@@ -3779,24 +3784,24 @@ fn _large_comb_next_core<'a, T, R, V>(
     ) -> Option<()> 
         where for<'r> F : FnMut(usize, usize, &mut R),
     {
-        if c[r - 1] == 0 {
-            (0..r).for_each(|i| {
-                result_change_fn(i, i, result);
-                c[i] = i;
-            });
+        (0..r).for_each(|i| {
+            result_change_fn(i, i, result);
+            c[i] = i;
+        });
 
-            return Some(());
-        }
-
-        None
+        return Some(());
     }
 
-    if let Some(()) = init_once(c, r, result, &mut result_change_fn) {
+    if let None = iterated {
+        *iterated = Some(());
+
+        init_once(c, r, result, &mut result_change_fn);
+
         // handle special case where data.len() == 1
         if data.len() == 1 {
-            println!("Dom.len() == 1");
-            c[0] = 1; // force cursor to go beyond data
+            c[0] = 1; // force cursor to go move or next call will reinit result
         }
+
         return Some(result_fn(&*result));
     }
 
@@ -3839,6 +3844,7 @@ pub struct LargeCombinationIterator<'a, T> where T : 'a {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
     result : Vec<&'a T>, // result container
@@ -3857,6 +3863,7 @@ impl<'a, T> LargeCombinationIterator<'a, T> {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
             result : result
@@ -3876,6 +3883,7 @@ impl<'a, T> Iterator for LargeCombinationIterator<'a, T> {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -3890,6 +3898,7 @@ impl<'a, T> Iterator for LargeCombinationIterator<'a, T> {
 
 impl<'a, T> IteratorReset for LargeCombinationIterator<'a, T> {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }
@@ -3944,6 +3953,7 @@ pub struct LargeCombinationCellIter<'a, T> where T : 'a {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
 
@@ -3962,6 +3972,7 @@ impl<'a, T> LargeCombinationCellIter<'a, T> {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
 
@@ -3982,6 +3993,7 @@ impl<'a, T> Iterator for LargeCombinationCellIter<'a, T> {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -3996,6 +4008,7 @@ impl<'a, T> Iterator for LargeCombinationCellIter<'a, T> {
 
 impl<'a, T> IteratorReset for LargeCombinationCellIter<'a, T> {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }
@@ -4062,6 +4075,7 @@ pub struct LargeCombinationRefIter<'a, T> where T : 'a {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
     i : usize, // slot index being mutate.
+    nexted : Option<()>, // If iterated at least once, it'd be Some(()). Otherwise, None.
     len : usize, // total possible number of combination.
     r : usize, // a size of combination.
 
@@ -4080,6 +4094,7 @@ impl<'a, T> LargeCombinationRefIter<'a, T> {
             c,
             data : data,
             i : 0,
+            nexted : None,
             len : divide_factorial(n, multiply_factorial(n - r, r)),
             r : r,
 
@@ -4106,6 +4121,7 @@ impl<'a, T> Iterator for LargeCombinationRefIter<'a, T> {
         _large_comb_next_core(
             &mut self.c,
             data,
+            &mut self.nexted,
             self.r,
             &mut self.result,
             |i, j, r| {
@@ -4120,6 +4136,7 @@ impl<'a, T> Iterator for LargeCombinationRefIter<'a, T> {
 
 impl<'a, T> IteratorReset for LargeCombinationRefIter<'a, T> {
     fn reset(&mut self) {
+        self.nexted = None;
         self.c.iter_mut().for_each(|c| *c = 0);
         self.i = 0;
     }
@@ -4541,6 +4558,7 @@ where T : Iterator<Item=V> + 'a,
 
             if let Some(_) = perm.next() {
                 // get next permutation of current permutator
+                println!("Get result");
                 return Some(());
             } 
         } 
@@ -6930,6 +6948,45 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
+    fn test_LargeCombinationIterator_single() {
+        use std::time::{Instant};
+        let data : &[i32] = &[1, 2, 3, 4, 5];
+        let k = 1;
+        let mut combs = LargeCombinationIterator::new(data, k);
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        for combination in combs.iter() {
+            println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+
+        println!("Total {} combinations in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k) / factorial(k), counter);
+
+        // test continue on exhausted iterator
+        for combination in combs.iter() {
+            println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+        assert_eq!(divide_factorial(data.len(), data.len() - k) / factorial(k), counter);
+        
+        // test reset the iterator
+        combs.reset();
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        for combination in combs.iter() {
+            println!("{}:{:?}", counter, combination);
+            counter += 1;
+        }
+
+        println!("Total {} combinations in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k) / factorial(k), counter);
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
     fn test_GosperCombinationIteratorUnsafe() {
         use std::time::{Instant};
         let data = &[1, 2, 3, 4, 5, 6];
@@ -7180,6 +7237,18 @@ pub mod test {
     }
 
     #[test]
+    fn test_combination_fn_k_1() {
+        let data : &[i32] = &[1, 2, 3, 4, 5, 6];
+        let k = 1;
+        let mut counter = 0;
+        combination(data, k, |_result| {
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[test]
     fn test_permutation_trait() {
         let mut data = [1, 2, 3, 4, 5];
         println!("{:?}", data);
@@ -7245,6 +7314,19 @@ pub mod test {
         let mut counter = 0;
         (&*data, 3usize).permutation().for_each(|_p| {
             // println!("{:?}", p);
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - 3));
+    }
+
+    #[allow(non_snake_case)]
+    #[test]
+    fn test_KPermutation_single() {
+        let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
+        let mut counter = 0;
+        (&*data, 1usize).permutation().for_each(|_p| {
+            println!("{:?}", _p);
             counter += 1;
         });
 
