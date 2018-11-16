@@ -1702,7 +1702,12 @@ fn _core_large_combination<'a, T : 'a, R : 'a>(
     cb(&result);
     let n = r - 1;
     c[n] += 1;
-    next_result_fn(n, c[n], &mut result);
+
+    if c[n] < domain.len() {
+        next_result_fn(n, c[n], &mut result);
+    } else {
+        return;
+    }
 
     loop {
         cb(&result);
@@ -7236,11 +7241,37 @@ pub mod test {
     }
 
     #[test]
-    fn test_combination_fn_k_1() {
+    fn test_large_combination_fn_k_1() {
         let data : &[i32] = &[1, 2, 3, 4, 5, 6];
         let k = 1;
         let mut counter = 0;
-        combination(data, k, |_result| {
+        large_combination(data, k, |_result| {
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[test]
+    fn test_large_combination_fn_d_eq_k() {
+        let data : &[i32] = &[1, 2, 3];
+        let k = 3;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            // println!("{:?}", _result);
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[test]
+    fn test_large_combination_fn() {
+        let data : &[i32] = &[1, 2, 3, 4, 5];
+        let k = 3;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            // println!("{:?}", _result);
             counter += 1;
         });
 
