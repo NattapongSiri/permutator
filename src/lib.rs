@@ -326,6 +326,8 @@ fn _cartesian_product_core(
     mut assign_res : impl FnMut(usize, usize), 
     mut cb : impl FnMut() )
 {
+    assert!(n > 0, "Cannot create cartesian product with number of domain == 0");
+
     let mut more = true;
     let mut i = 0;
     let mut c = vec![0; n];
@@ -342,7 +344,7 @@ fn _cartesian_product_core(
             i += 1;
         }
 
-        while c[i] == set_len(i) {
+        while c[i] == set_len(i) { // c[i] reach the length of set[i]
             c[i] = 0;
             
             if i == 0 {
@@ -843,6 +845,7 @@ where T : 'a,
       for<'r> F : FnMut(&'r [&'a T]) + 'a
 {
     let mut result = vec![&set[0]; n];
+
     let copied = result.as_slice() as *const [&T];
 
     unsafe {
@@ -7193,6 +7196,25 @@ pub mod test {
         println!("Total {} product done in {:?}", counter, timer.elapsed());
     }
 
+    #[allow(unused)]
+    #[should_panic]
+    #[test]
+    fn test_self_cartesian_product_zero() {
+        use std::time::Instant;
+        let data : &[i32] = &[1, 2, 3];
+        let n = 0;
+
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        self_cartesian_product(&data, n, |product| {
+            println!("{:?}", product);
+            counter += 1;
+        });
+
+        println!("Total {} product done in {:?}", counter, timer.elapsed());
+    }
+
     #[test]
     fn test_combination_trait() {
         let data = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -7450,20 +7472,6 @@ pub mod test {
         let mut counter = 0;
 
         combination(&data, r, |comb| {
-            println!("{:?}", comb);
-            counter += 1;
-        });
-
-        assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
-    }
-
-    #[test]
-    fn test_large_combination_fn() {
-        let data = [1, 2, 3, 4, 5];
-        let r = 3;
-        let mut counter = 0;
-
-        large_combination(&data, r, |comb| {
             println!("{:?}", comb);
             counter += 1;
         });
