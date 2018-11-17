@@ -54,15 +54,16 @@ domains.cart_prod().for_each(|cp| {
 });
 ```
 ## The `copy` module
-This crate split into two modules. One is root module which can be used in most of the case. Another is `copy` module which require that the type implement `Copy` trait. The root module always return value as a collection of `&T`, except all heap permutaiton family. The `copy` module always return value as a collection of `T`.
+This crate split into two modules. One is root module which can be used in most of the case. Another is `copy` module which require that the type implement `Copy` trait. The root module return value as a collection of `&T`, except all Heap permutaiton family. The `copy` module always return value as a collection of `T`. There's no Heap permutation function in `copy` module because it did permutation in place. There's no copy nor create any reference.
 ### Note
-- All heap permutation functions are not in "copy" module because it's already do permutation in place.
-- All heap permutation iterators are also in "copy" module. This is because `K-Permutation` iterator family depends on `HeapPermutation` iterator family but `HeapPermutation` iterator family in root module doesn't require `T` to implement `Copy` trait while `K-Permutation` iterator family require `T` to implement `Copy` trait.
+All heap permutation iterators are also in "copy" module. This is because `K-Permutation` iterator family depends on `HeapPermutation` iterator family but `HeapPermutation` iterator family in root module doesn't require `T` to implement `Copy` trait while `K-Permutation` iterator family require `T` to implement `Copy` trait. However, both `copy` and root module do exactly the same operation. There's no copy nor borrow operation as the algorithm itself do permutation in place.
 ## Get a permutation at specific point, not an iterator style.
-It provides 2 functions to get a cartesian product or k-permutation:
+It crate provides 2 functions to get a cartesian product or k-permutation:
 - get_cartesian_for
 - get_permutation_for
-It also provide utilities functions like:
+It perform mathematically calculation and return the result at that position. It doesn't skip the iteration. It useful when the domains is very large. Otherwise, simply skip the iteration may be faster. For example, in uncontrol test environment, heap_permutation function compile with --release flag can permute about 88 million permutations per second.
+
+This crate also provides utilities functions like:
 - get_cartesian_size
 - get_permutation_size
 ## Get a cartesian product over a set itself multiple times
@@ -70,19 +71,20 @@ There are two distinct implementation to get cartesian product.
 - Iterator that return product
 - Function that call callback function to return product
 ### Iterator 
-This crate provides `SelfCartesianProductIterator`, `SelfCartesianProductCellIter`, and `SelfCartesianProductRefIter` structs that implement
-`Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
+This crate provides `SelfCartesianProductIterator`, `SelfCartesianProductCellIter`, and `SelfCartesianProductRefIter` structs that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
 - `SelfCartesianProductIterator` can be used in any case that performance is least concern.
 - `SelfCartesianProductCellIter` can be used in case performance is important as well as safety.
 - `SelfCartesianProductRefIter` can be used in case performance is critical and safety will be handle by caller.
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
-This crate provides `CartesianProduct` trait which add function `cart_prod` that return an Iterator to generate a `Cartesian Product` over a set itself multiple times. The types that currently support are:
-- (&'a [T], usize) - Generate cartesian product over 'first paramter' for 'second paramater' times.
-- (&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>) - Similar to above but keep overwrite the product into 'third parameter'
-- (&'a [T], usize, *mut [&'a T]) - Similar to above but use unsafe pointer to store value.
-Each type above return different Iterator. For example (&'a [T], usize) return `SelfCartesianProductIterator` but on (&'a [T], usize, *mut [&'a T]) return `SelfCartesianProductRefIter`.
+This crate provides `CartesianProduct` trait in both root module and `copy` module which add function `cart_prod` that return an Iterator to generate a `Cartesian Product` over a set itself multiple times. The types that currently support are:
+- `(&'a [T], usize)` - Generate cartesian product over 'first paramter' for 'second paramater' times.
+- `(&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>)` - Similar to above but keep overwrite the product into 'third parameter'. **This type require trait from root module.**
+- `(&'a [T], usize, *mut [&'a T])` - Similar to above but use unsafe pointer to store value. **This type require trait from root module.** Each type above return different Iterator. For example `(&'a [T], usize)` return `SelfCartesianProductIterator` but on `(&'a [T], usize, *mut [&'a T])` return `SelfCartesianProductRefIter`.
+- `(&'a [T], usize, Rc<RefCell<&'a mut [T]>>)` - Similar to above but keep overwrite the product into 'third parameter'. **This type require trait from `copy` module.**
+- `(&'a [T], usize, *mut [T])` - Similar to above but use unsafe pointer to store value. **This type require trait from `copy` module.**
+Each type above return different Iterator. For example `(&'a [T], usize)` return `copy::SelfCartesianProductIterator` but on `(&'a [T], usize, *mut [T])` return `copy::SelfCartesianProductRefIter`.
 ### Callback function
 This crate provides 4 functions that serve different usecase.
 - `self_cartesian_product` function that return product as callback parameter
@@ -90,9 +92,10 @@ This crate provides 4 functions that serve different usecase.
 - `self_cartesian_product_sync` function that return product into Arc<RwLock<>> given in function parameter
 - `unsafe_self_cartesian_product` unsafe function that return product into mutable pointer given in function parameter
 ## Get a cartesian product over multiple sets
-There are two distinct implementation to get cartesian product.
+There are three distinct implementation to get cartesian product.
 - Iterator that return product
 - Function that call callback function to return product
+- `CartesianProduct` trait that add `cart_prod` function to `&[&[T]]`, `(&[&[T]], Rc<RefCell<&mut[&T]>>)`
 ### Iterator 
 This crate provides `CartesianProductIterator`, `CartesianProductCellIter`, and `CartesianProductRefIter` structs that implement
 `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
@@ -102,87 +105,88 @@ This crate provides `CartesianProductIterator`, `CartesianProductCellIter`, and 
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
-This crate provides `CartesianProduct` trait and basic implementation various types such as generic slice of slices, generic Vec of slices, tuple of (&'a [&'a [T]], Rc<RefCell<&'a mut[&'a T]>>), and tuple of (&'a [&'a [T]], *mut [&'a T]).
-It add `cart_prod()` function to it and return required iterator based on type of data. For example on generic Vec of slices return `CartesianProductIterator` but on (&'a [&'a [T]], *mut [&'a T]) return `CartesianProductRefIter`.
+This crate provides `CartesianProduct` trait in both root module and `copy` module. It is implemented on various types such as generic slice of slices, generic Vec of slices, tuple of `(&'a [&'a [T]], Rc<RefCell<&'a mut[&'a T]>>)`, and tuple of `(&'a [&'a [T]], *mut [&'a T])`.
+It add `cart_prod()` function to it and return required iterator based on type of data. For example on generic Vec of slices return `CartesianProductIterator` but on `(&'a [&'a [T]], *mut [&'a T])` return `CartesianProductRefIter`.
 ### Callback function
-This crate provides 4 functions that serve different usecase.
+This crate provides 4 similar functions on 2 modules that serve different usecase.
+These 4 functions in root module:
 - `cartesian_product` function that return product as callback parameter
-- `cartesian_product_cell` function that return product into Rc<RefCell<>> given in function parameter
-- `cartesian_product_sync` function that return product into Arc<RwLock<>> given in function parameter
-- `unsafe_cartesian_product` unsafe function that return product into mutable pointer given in function parameter
+- `cartesian_product_cell` function that return product into `Rc<RefCell<>>` given in function parameter
+- `cartesian_product_sync` function that return product into `Arc<RwLock<>>` given in function parameter
+- `unsafe_cartesian_product` unsafe function that return product into mutable pointer given in function 
+and all 4 functions in `copy` module which do exactly the same except that each element is `T` rather than `&T`
 ## Get a combination from data
 There are three distinct implementation to get k-combinations of n set.
 - Iterator that return each combination on each iteration
-- Trait that add function to slice, Vec, Rc<RefCell<&mut[&T]>>, etc.
+- Trait that add function to slice, `Vec`, `Rc<RefCell<&mut[&T]>>`, etc.
 - Function that call callback function to return product
 ### Iterator
-This crate provides `GosperCombinationIterator`, `GosperCombinationCellIter`, and `GosperCombinationRefIter` structs that implement
-`IntoIterator` traits. Each struct serves different use cases:-
-- `GosperCombinationIterator` can be used in any case that performance is least concern.
-- `GosperCombinationCellIter` can be used in case performance is important as well as safety.
-- `GosperCombinationRefIter` can be used in case performance is critical and safety will be handle by caller.
-- These struct isn't implement Iterator itself but it still provide `reset` function to reset state of the object instead of creating a new object.
-It's also provides `CombinationIterator`, `CombinationCellIter`, and `CombinationRefIter` structs that implement
-`Iterator`, `IteratorReset`, `ExactSizeIterator` traits which is an `Iterator` representation of each respectively `GosperCombination` structs
+This crate provides `LargeCombinationIterator`, `LargeCombinationCellIter`, and `LargeCombinationRefIter` structs in two modules that implement `Iterator`, `IteratorReset`, and `ExactSizeIterator` traits. Each struct serves different use cases:-
+- `LargeCombinationIterator` can be used in any case that performance is least concern.
+- `LargeCombinationCellIter` can be used in case performance is important as well as safety.
+- `LargeCombinationRefIter` can be used in case performance is critical and safety will be handle by caller.
+All 3 structs in two modules are only different on the return type. The root module has `&T` element in result while `copy` module has copied `T` element in result.
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
-This crate provides `Combination` trait and basic implementation various types such as generic slice, generic Vec, tuple of (&'a [T], Rc<RefCell<&'a mut[&'a T]>>), and tuple of (&'a [T], * mut[&'a T]).
-It add `combination(usize)` function to it and return required iterator based on type of data. For example on generic Vec return `CombinationIterator` but on (&'a [T], * mut[&'a T]) return `CombinationRefIter`.
-Note:
-- It doesn't return `GosperCombination` family of structs but return a direct `Iterator` implemented object.
+This crate provides `Combination` trait in both root module and `copy` module. It provides basic implementation on various types such as generic slice, generic `Vec`, tuple of `(&'a [T], Rc<RefCell<&'a mut[&'a T]>>)`, and tuple of `(&'a [T], * mut[&'a T])`.
+It add `combination(usize)` function to it and return required iterator based on type of data. For example on generic Vec return `LargeCombinationIterator` but on `(&'a [T], * mut[&'a T])` return `LargeCombinationRefIter`.
 ### Callback function
-This crate provide 4 functions that serve different usecase.
-- `combination` function that return product as callback parameter
-- `combination_cell` function that return product into Rc<RefCell<>> given in function parameter
-- `combination_sync` function that return product into Arc<RwLock<>> given in function parameter
-- `unsafe_combination` unsafe function that return product into mutable pointer given in function parameter
+This crate provide 4 functions in 2 modules that serve different usecase.
+- `large_combination` function that return product as callback parameter
+- `large_combination_cell` function that return product into `Rc<RefCell<>>` given in function parameter
+- `large_combination_sync` function that return product into `Arc<RwLock<>>` given in function parameter
+- `unsafe_large_combination` unsafe function that return product into mutable pointer given in function parameter
+The different between root module and `copy` module is that the product contains `&T` in root module while in `copy` module contains copied `T`.
 ## Get a permutation from data
 There are three distinct implementation to get permutation.
 - Iterator that do permutation on data
 - Trait that add function to slice, Vec, etc.
 - Function that call callback function to return each permutation
 ### Iterator
-This crate provides `HeapPermutationIterator`, `HeapPermutationCellIter`, and `HeapPermutationRefIter` structs that implement
-`Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
+This crate provides `HeapPermutationIterator`, `HeapPermutationCellIter`, and `HeapPermutationRefIter` structs in both root module and `copy` module that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
 - `HeapPermutationIterator` can be used in any case that performance is least concern.
 - `HeapPermutationCellIter` can be used in case performance is important as well as safety.
 - `HeapPermutationRefIter` can be used in case performance is critical and safety will be handle by caller.
+The only different between root module and `copy` module is that in `copy` module type `T` need to implement `Copy` trait.
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
-This crate provides `Permutation` trait and basic implementation various types such as generic slice, generic Vec, tuple of (&'a mut[T], Rc<RefCell<&'a mut[T]>>, and more type but used for [k-permutation](#get-a-k-permutation-from-data).
-It add `permutation()` function to it and return required iterator based on type of data. For example on generic Vec return `HeapPermutationIterator` but on (&'a mut [T], Rc<RefCell<&'a mut[T]>>) return `HeapPermutationCellIter`.
+This crate provides `Permutation` trait in root module and `copy` module. It provide basic implementation various types such as generic slice, generic Vec, tuple of `(&'a mut[T], Rc<RefCell<&'a mut[T]>>`, and more type but used for [k-permutation](#get-a-k-permutation-from-data).
+It add `permutation()` function to it and return required iterator based on type of data. For example on generic Vec return `HeapPermutationIterator` but on `(&'a mut [T], Rc<RefCell<&'a mut[T]>>)` return `HeapPermutationCellIter`.
 ### Callback function
-This crate provide 3 functions that serve different usecase.
+This crate provide 3 functions in root module that serve different usecase.
 - `heap_permutation` function that return product as callback parameter
 - `heap_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
 - `heap_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
+**There is no heap permutation function family in `copy` module.**
 ## Get a k-permutation from data
-There are three implementation to get k-permutations of n set.
+There are three implementation to get k-permutations.
 - Iterator that return product
 - Trait that add functionality to some specific tuple.
 - Function that call callback function to return product
 ### Iterator
-This crate provides `KPermutationIterator`, `KPermutationCellIter`, and `KPermutationRefIter` structs that implement
-`Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
+This crate provides `KPermutationIterator`, `KPermutationCellIter`, and `KPermutationRefIter` structs in root module and `copy` module that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
 - `KPermutationIterator` can be used in any case that performance is least concern.
 - `KPermutationCellIter` can be used in case performance is important as well as safety.
 - `KPermutationRefIter` can be used in case performance is critical and safety will be handle by caller.
+The different between root module produces collection of `&T` but `copy` module produces collection of copied `T`
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
-This crate provides `Permutation` trait that can be used to perform on tuple of (&'a [T], usize), tuple of (&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>), and (&'a [T], usize, *mut [&'a T]) to create different type of iterator.
-It add `permutation()` function to it and return required iterator based on type of data. For example on (&'a [T], usize) return `KPermutationIterator` but on (&'a [T], usize, *mut [&'a T]) return `KPermutationRefIter`.
+This crate provides `Permutation` trait in root module that can be used to perform k-permutation on tuple of `(&'a [T], usize)`, tuple of `(&'a [T], usize, Rc<RefCell<&'a mut [&'a T]>>)`, and `(&'a [T], usize, *mut [&'a T])` to create different type of iterator.
+The `Permutation` trait in `copy` module can be used to perform k-permutation on tuple of `(&'a [T], usize)`, tuple of `(&'a [T], usize, Rc<RefCell<&'a mut [T]>>)`, and `(&'a [T], usize, *mut [T])` to create different type of iterator.
+It add `permutation()` function to it and return required iterator based on type of data. For example on (&'a [T], usize) return `KPermutationIterator` but on `(&'a [T], usize, *mut [&'a T])` return `KPermutationRefIter`.
 ### Callback function
-This crate provide 4 functions that serve different usecase.
+This crate provide 4 functions in both root module and `copy` module that serve different usecase.
 - `k_permutation` function that return product as callback parameter
 - `k_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
 - `k_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
 - `unsafe_k_permutation` unsafe function that return product into mutable pointer given in function parameter
+The different between root module and `copy` module is that the root module return a collection of `&T` while the `copy` module return collection of `T`
 ## Notes
 ### Struct with `RefIter` and `CellIter` suffix return empty Item on each Iteration
-Struct like `CartesianProductIterator`, `CombinationIterator`, `HeapPermutationIterator`, `KPermutationIterator` return fresh new Vec on each iteration. All other structs that have other way to return value will return empty tuple on each iteration. For example, `CartesianProductCellIter`, `CombinationRefIter`, `HeapPermutationCellIter`, and `KPermutationRefIter` all return empty tuple on each iteration. It return result via parameter specified when instantiate an object. For example, method `new` on `CartesianProductCellIter` require Rc<RefCell<&mut [&T]>> parameter which will be used to store each cartesian product from each iteration.
+Struct like `CartesianProductIterator`, `CombinationIterator`, `HeapPermutationIterator`, `KPermutationIterator` return fresh new Vec on each iteration. All other structs that have other way to return value will return empty tuple on each iteration. For example, `CartesianProductCellIter`, `CombinationRefIter`, `HeapPermutationCellIter`, and `KPermutationRefIter` all return empty tuple on each iteration. It return result via parameter specified when instantiate an object. For example, method `new` on `CartesianProductCellIter` in root module requires `Rc<RefCell<&mut [&T]>>` parameter which will be used to store each cartesian product from each iteration.
 It's important to keep in mind that these struct with suffix `RefIter` and `CellIter` **overwrite** the result of previous iteration on every iteration. If every result from each iteration need to be kept, consider using non-suffix version. For example, instead of using `KPermutationRefIter` and clone/copy every result into Vec, consider using `KPermutationIterator` instead.
 ### Performance concern
 - For primitive data type, module `copy` and root module performance is roughly equivalent.
@@ -199,24 +203,12 @@ convert it to owned value to share result.
 - This crate provides two built-in methods to send result to other threads.
     1. callback function with "_sync" suffix.
     2. Iterator that return an owned value.
-The fastest and safest way to send result to other threads is to use an Iterator that return
-owned value. It's about 50%-200% faster than using callback function.
+The fastest and safest way to send result to other threads is to use an Iterator that return owned value. It's about 50%-200% faster than using callback function with "_sync" suffix.
 ### Mutating result is dangerous
-Most of sharing result use interior mutability so that the function/struct only borrow the
-sharing result. It'll mutably borrow only when it's going to mutate result and drop the mutable
-borrow immediately before calling a callback or return result from iteration. 
-This mean that the result is also mutable on user side. However, doing so may result in undesired
-behavior. For example: heap_permutation_cell function swap a pair of element inside Rc<RefCell<>>
-in place. If user swap value inside result, some permutation return in the future may duplicate with
-the already return one. If user remove some value inside result, it'll panic because inside
-the heap_permutation_cell function unrecognize the size changed.
+Most of sharing result use interior mutability so that the function/struct only borrow the sharing result. It'll mutably borrow only when it's going to mutate result and drop the borrow immediately before calling a callback or return result from iteration. This mean that the result is also mutable on user side. However, doing so may result in undesired behavior. For example: `heap_permutation_cell` function swap a pair of element inside `Rc<RefCell<>>` in place. If user swap value inside result, some permutation return in the future may duplicate with the already return one. If user remove some value inside result, it'll panic because inside the `heap_permutation_cell` function unrecognize the size changed.
 ### Send result to other thread is complicated
 This crate provides two built-in methods to send result across thread. The two usecase is strongly
-against each other in term of performance.
-The callback with "_sync" suffix store borrowed result into Arc<RwLock<>> which reduce the cost
-of allocating additional memory and copy/clone the result into it. Each thread that read borrowed
-content may need additional overhead of communication especially if it cannot miss any of the data
-send to it. In such case, the following scenario is applied
+against each other in term of performance. The callback with "_sync" suffix store borrowed result into Arc<RwLock<>> which reduce the cost of allocating additional memory and copy/clone the result into it. Each thread that read borrowed content may need additional overhead of communication especially if it cannot miss any of the data send to it. In such case, the following scenario is applied
 1. The function generate new result
 2. The function send notification via channel to every threads that new result is available.
 3. The function block until every thread send notification back that they are all done with the data.
@@ -228,10 +220,7 @@ This is much simpler to implement but require more memory. It'll simplify the sc
 The performance observed in uncontrolled test environment show that the iterator way
 is faster than the callback by at least 50%.
 ### Unsafe way is fastest and hardest
-It's because all "unsafe_" prefix function and struct with `RefIter` suffix return result throught mutable pointer that
-make it has lowest cost to send result back. It leave everything else to user to do the work.
-To use it, make sure that the memory is return when it no longer use, synchronization, initialization
-is properly done. The original variable owner outlive both user and generator.
+It's because all "unsafe_" prefix function and struct with `RefIter` suffix return result throught mutable pointer that make it has lowest cost to send result back. It leave everything else to user to do the work. To use it, make sure that the memory is return when it no longer use, synchronization, initialization is properly done. The original variable owner outlive both user and generator.
 # Example
 ## Get a permutation at specific point examples
 To get into 'n' specific lexicographic permutation, 
@@ -314,16 +303,16 @@ manually call next with borrowed mut variable that
 will store the next combination.
 ```Rust
 // Combination iterator
-use permutator::GosperCombinationIterator;
+use permutator::LargeCombinationIterator;
 use std::time::{Instant};
 let data = [1, 2, 3, 4, 5];
-let gosper = GosperCombinationIterator::new(&data, 3);
+let combinations = LargeCombinationIterator::new(&data, 3);
 let mut counter = 0;
 let timer = Instant::now();
 
-for combination in gosper {
+for combination in combinations {
     // uncomment a line below to print each combination
-    // println!("{}:{:?}", counter, combination);
+    println!("{}:{:?}", counter, combination);
     counter += 1;
 }
 
@@ -340,7 +329,7 @@ let timer = Instant::now();
 
 data.combination(3).for_each(|combination| {
     // uncomment a line below to print each combination
-    // println!("{}:{:?}", counter, combination);
+    println!("{}:{:?}", counter, combination);
     counter += 1;
 }
 
@@ -359,7 +348,7 @@ let timer = Instant::now();
 let mut counter = 1;
 
 for permutated in permutator {
-    // println!("{}:{:?}", counter, permutated);
+    println!("{}:{:?}", counter, permutated);
     counter += 1;
 }
 
@@ -380,14 +369,14 @@ use std::time::{Instant};
 let data = &mut [1, 2, 3, 4];
 let result = Rc::new(RefCell::new(data));
 // print original data before permutation
-// println!("0:{:?}", &*result.borrow());
+println!("0:{:?}", &*result.borrow());
 let mut permutator = HeapPermutationCellIter::new(Rc::clone(&result));
 let timer = Instant::now();
 let mut counter = 1;
 
 for _ in permutator {
     // uncomment the line below to print all possible permutation
-    // println!("{}:{:?}", counter, &*result.borrow());
+    println!("{}:{:?}", counter, &*result.borrow());
     counter += 1;
 }
 
@@ -529,7 +518,7 @@ and callback function `_cell` suffix. For example:
 2. The object that pointer is pointed to need to be release.
 3. Result synchronization, both in single and multiple thread(s).
 4. ...
-5. All other unsafe Rust conditions applied
+5. All other unsafe Rust conditions may applied
 
 Example:
 - unsafe callback function
@@ -552,7 +541,7 @@ Example:
 ```
 - unsafe Iterator object
 ```Rust
-    use permutator::GosperCombinationRefIter;
+    use permutator::LargeCombinationRefIter;
     let data = [1, 2, 3, 4, 5];
     let r = 3;
     let mut counter = 0;
@@ -560,7 +549,7 @@ Example:
     let result_ptr = result.as_mut_slice() as *mut [&usize];
 
     unsafe {
-        let comb = GosperCombinationRefIter::new(&data, r, result_ptr);
+        let comb = LargeCombinationRefIter::new(&data, r, result_ptr);
         for _ in comb {
             println!("{:?}", result);
             counter += 1;
@@ -741,6 +730,24 @@ inside the buffer. The sender will block until the receiver read the data.
     thread::spawn(move || {
         start_k_permutation_process(data, result_sync, k, vec![t1_send, t2_send], main_recv);
     }).join().unwrap();
+```
+## Breaking change from 0.2.x to 0.3.0
+`combination` from root module and `copy` module now return "Large" combination family.
+### Rationale
+All "Gosper" combination family is supersede by "Large" combination family. It doesn't mark those family deprecated yet. There's only Rust document that state it being deprecated. This is because the reason for being deprecated is that the implementation in this crate is inefficient. Each time that gosper algorithm generate new value, it copied all value or create new ref for that combination. In contrast to "Large" family that only copy or create new ref when the combination at that position changed. This make "Large" family combination faster over 10 times. So unless more efficient implementation is available, after sometime, the "Gosper" family function may officially mark deprecated. There's also "Gosper" combination family limitation that it can generate combination as many as bits of variable that support fast bit operation, which Rust currently is capped to 128 bits so source be as large as 128 elements slice. In practical, this is more than enough on most case. But in some edge case, "Large" combination family permit a combination on data as many as `usize` max value, which is 2^32 on 32 bits platform and 2^64 on 64 bits platform. The result from "Large" combination family is lexicographic ordered if the source is lexicographic ordered.
+
+Internally, k-permutation family are all migrated to use "Large" combination family instead of "Gosper" family.
+## Migration guide from 0.2.x to 0.3.0
+- `combination*` functions become `large_combination*` functions.
+- `GosperCombination*` structs become `LargeCombination*` structs.
+For example:
+```Rust
+    // This line will be error in 0.3.0
+    let combinations : GosperCombinationIterator = [1, 2, 3, 4, 5].combination(3);
+```
+Become
+```Rust
+    let combinations : LargeCombinationIterator = [1, 2, 3, 4, 5].combination(3);
 ```
 ## Breaking change from 0.1.6 to 0.2.0
 Version 0.2.0 has major overhaul on entire crate to make use case more consistent on each other functionalities. There are now only 2 major distinct styles. 1. Callback function 2. Iterator object. The Iterator object has 2 sub-style. 1. Plain `Iterator` style. 2. Shared `Iterator` style. The shared `Iterator` style has both safe and unsafe kind of share which is similar to callback style counterpart. It need to rename every structs. It add one more trait and some more types.
