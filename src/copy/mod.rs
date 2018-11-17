@@ -1652,6 +1652,8 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[T]) -> ()) wh
 /// - [k_permutation function](fn.k_permutation.html)
 pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut [T], mut cb : impl FnMut() -> ()) where T : Copy{
     assert_eq!(k, (*result).len());
+    assert_ne!(k, 0);
+    assert!(k <= d.len());
 
     unsafe_large_combination(d, k, result, || {
         cb();
@@ -1752,6 +1754,8 @@ pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut 
 pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a mut [T]>>, mut cb : impl FnMut() -> ()) where T : Copy {
     assert_ne!(k, 0);
     assert_eq!(k, result.borrow().len());
+    assert!(k <= d.len());
+
     large_combination_cell(d, k, Rc::clone(&result), || {
         cb();
 
@@ -1874,6 +1878,8 @@ pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a
 pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec<T>>>, mut cb : impl FnMut() -> ()) where T : Copy {
     assert_ne!(k, 0);
     assert_eq!(k, result.read().unwrap().len());
+    assert!(k <= d.len());
+    
     large_combination_sync(d, k, Arc::clone(&result), || {
         cb();
 

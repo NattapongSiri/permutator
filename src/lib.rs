@@ -1700,6 +1700,9 @@ fn _core_large_combination<'a, T : 'a, R : 'a>(
         }
     }
 
+    assert_ne!(r, 0, "The combination size cannot be 0");
+    assert!(domain.len() >= r, "The combination size cannot be larger than size of data");
+
     let mut c : Vec<usize> = Vec::new();
     let mut result = first_result_fn(&mut c, domain, r);
     cb(&result);
@@ -1708,22 +1711,16 @@ fn _core_large_combination<'a, T : 'a, R : 'a>(
 
     if c[n] < domain.len() {
         next_result_fn(n, c[n], &mut result);
+        cb(&result);
     } else {
         return;
     }
 
-    loop {
-        cb(&result);
+    while c[0] < domain.len() - r {
 
         // move cursor and update result
         move_cur_res(&mut c, domain, &mut result, &mut next_result_fn);
-
-        if c[0] >= domain.len() - r {
-            // cursor of first slot reach possible rightmost
-            next_result_fn(0, c[0], &mut result);
-            cb(&result);
-            break;
-        }
+        cb(&result);
     }
 }
 
@@ -6712,10 +6709,47 @@ pub mod test {
 
     #[allow(unused)]
     #[test]
-    fn test_k_permutation() {
+    fn test_k_permutation_fn() {
         use std::time::{Instant};
         let data = [1, 2, 3, 4, 5];
         let k = 3;
+        let mut counter = 0;
+        let timer = Instant::now();
+        k_permutation(&data, k, |permuted| {
+            // uncomment line below to print all k-permutation
+            println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        });
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
+    }
+
+    #[allow(unused)]
+    #[should_panic]
+    #[test]
+    fn test_k_permutation_empty_dom() {
+        use std::time::{Instant};
+        let data : &[i32] = &[];
+        let k = 1;
+        let mut counter = 0;
+        let timer = Instant::now();
+        k_permutation(&data, k, |permuted| {
+            // uncomment line below to print all k-permutation
+            println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        });
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
+    }
+
+    #[allow(unused)]
+    #[test]
+    fn test_k_permutation_k_1() {
+        use std::time::{Instant};
+        let data : &[i32] = &[1, 2];
+        let k = 1;
         let mut counter = 0;
         let timer = Instant::now();
         k_permutation(&data, k, |permuted| {
@@ -7266,6 +7300,19 @@ pub mod test {
     fn test_large_combination_fn_k_1() {
         let data : &[i32] = &[1, 2, 3, 4, 5, 6];
         let k = 1;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[should_panic]
+    #[test]
+    fn test_large_combination_fn_k_0() {
+        let data : &[i32] = &[1, 2, 3, 4, 5, 6];
+        let k = 0;
         let mut counter = 0;
         large_combination(data, k, |_result| {
             counter += 1;
