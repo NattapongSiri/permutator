@@ -1651,9 +1651,9 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[T]) -> ()) wh
 /// # See
 /// - [k_permutation function](fn.k_permutation.html)
 pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut [T], mut cb : impl FnMut() -> ()) where T : Copy{
-    assert_eq!(k, (*result).len());
-    assert_ne!(k, 0);
-    assert!(k <= d.len());
+    assert_eq!(k, (*result).len(), "Result is too large. Result length need to be exactly equals to 'k'");
+    assert_ne!(k, 0, "'k' cannot be zero");
+    assert!(k <= d.len(), "'k' is larger than number of data");
 
     unsafe_large_combination(d, k, result, || {
         cb();
