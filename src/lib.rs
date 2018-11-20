@@ -326,6 +326,8 @@ fn _cartesian_product_core(
     mut assign_res : impl FnMut(usize, usize), 
     mut cb : impl FnMut() )
 {
+    assert!(n > 0, "Cannot create cartesian product with number of domain == 0");
+
     let mut more = true;
     let mut i = 0;
     let mut c = vec![0; n];
@@ -342,7 +344,7 @@ fn _cartesian_product_core(
             i += 1;
         }
 
-        while c[i] == set_len(i) {
+        while c[i] == set_len(i) { // c[i] reach the length of set[i]
             c[i] = 0;
             
             if i == 0 {
@@ -843,6 +845,7 @@ where T : 'a,
       for<'r> F : FnMut(&'r [&'a T]) + 'a
 {
     let mut result = vec![&set[0]; n];
+
     let copied = result.as_slice() as *const [&T];
 
     unsafe {
@@ -1697,25 +1700,27 @@ fn _core_large_combination<'a, T : 'a, R : 'a>(
         }
     }
 
+    assert_ne!(r, 0, "The combination size cannot be 0");
+    assert!(domain.len() >= r, "The combination size cannot be larger than size of data");
+
     let mut c : Vec<usize> = Vec::new();
     let mut result = first_result_fn(&mut c, domain, r);
     cb(&result);
     let n = r - 1;
     c[n] += 1;
-    next_result_fn(n, c[n], &mut result);
 
-    loop {
+    if c[n] < domain.len() {
+        next_result_fn(n, c[n], &mut result);
         cb(&result);
+    } else {
+        return;
+    }
+
+    while c[0] < domain.len() - r {
 
         // move cursor and update result
         move_cur_res(&mut c, domain, &mut result, &mut next_result_fn);
-
-        if c[0] >= domain.len() - r {
-            // cursor of first slot reach possible rightmost
-            next_result_fn(0, c[0], &mut result);
-            cb(&result);
-            break;
-        }
+        cb(&result);
     }
 }
 
@@ -6704,10 +6709,47 @@ pub mod test {
 
     #[allow(unused)]
     #[test]
-    fn test_k_permutation() {
+    fn test_k_permutation_fn() {
         use std::time::{Instant};
         let data = [1, 2, 3, 4, 5];
         let k = 3;
+        let mut counter = 0;
+        let timer = Instant::now();
+        k_permutation(&data, k, |permuted| {
+            // uncomment line below to print all k-permutation
+            println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        });
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
+    }
+
+    #[allow(unused)]
+    #[should_panic]
+    #[test]
+    fn test_k_permutation_empty_dom() {
+        use std::time::{Instant};
+        let data : &[i32] = &[];
+        let k = 1;
+        let mut counter = 0;
+        let timer = Instant::now();
+        k_permutation(&data, k, |permuted| {
+            // uncomment line below to print all k-permutation
+            println!("{}:{:?}", counter, permuted);
+            counter += 1;
+        });
+
+        println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+        assert_eq!(divide_factorial(data.len(), data.len() - k), counter);
+    }
+
+    #[allow(unused)]
+    #[test]
+    fn test_k_permutation_k_1() {
+        use std::time::{Instant};
+        let data : &[i32] = &[1, 2];
+        let k = 1;
         let mut counter = 0;
         let timer = Instant::now();
         k_permutation(&data, k, |permuted| {
@@ -7188,6 +7230,25 @@ pub mod test {
         println!("Total {} product done in {:?}", counter, timer.elapsed());
     }
 
+    #[allow(unused)]
+    #[should_panic]
+    #[test]
+    fn test_self_cartesian_product_zero() {
+        use std::time::Instant;
+        let data : &[i32] = &[1, 2, 3];
+        let n = 0;
+
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        self_cartesian_product(&data, n, |product| {
+            println!("{:?}", product);
+            counter += 1;
+        });
+
+        println!("Total {} product done in {:?}", counter, timer.elapsed());
+    }
+
     #[test]
     fn test_combination_trait() {
         let data = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -7236,11 +7297,50 @@ pub mod test {
     }
 
     #[test]
-    fn test_combination_fn_k_1() {
+    fn test_large_combination_fn_k_1() {
         let data : &[i32] = &[1, 2, 3, 4, 5, 6];
         let k = 1;
         let mut counter = 0;
-        combination(data, k, |_result| {
+        large_combination(data, k, |_result| {
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[should_panic]
+    #[test]
+    fn test_large_combination_fn_k_0() {
+        let data : &[i32] = &[1, 2, 3, 4, 5, 6];
+        let k = 0;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[test]
+    fn test_large_combination_fn_d_eq_k() {
+        let data : &[i32] = &[1, 2, 3];
+        let k = 3;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            // println!("{:?}", _result);
+            counter += 1;
+        });
+
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k) / factorial(k) ); // n!/(k!(n-k!))
+    }
+
+    #[test]
+    fn test_large_combination_fn() {
+        let data : &[i32] = &[1, 2, 3, 4, 5];
+        let k = 3;
+        let mut counter = 0;
+        large_combination(data, k, |_result| {
+            // println!("{:?}", _result);
             counter += 1;
         });
 
@@ -7419,20 +7519,6 @@ pub mod test {
         let mut counter = 0;
 
         combination(&data, r, |comb| {
-            println!("{:?}", comb);
-            counter += 1;
-        });
-
-        assert_eq!(counter, divide_factorial(data.len(), data.len() - r) / factorial(r));
-    }
-
-    #[test]
-    fn test_large_combination_fn() {
-        let data = [1, 2, 3, 4, 5];
-        let r = 3;
-        let mut counter = 0;
-
-        large_combination(&data, r, |comb| {
             println!("{:?}", comb);
             counter += 1;
         });
