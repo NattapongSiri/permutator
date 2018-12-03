@@ -2651,6 +2651,146 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
     // }
 }
 
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// The sample implementation in C++ can be found in [Kevin Lynch 
+/// repository.](https://gist.github.com/klynch/807973/cf05e785a68a5ae8b6a3381752583b97186f6140)
+/// He implemented Algorithm X in an structured iterator style.
+/// The discussion on how to implement "Algorithm X" in structured fashion in 
+/// discussed [here](https://stackoverflow.com/questions/37079307/untying-knuths-knots-how-to-restructure-spaghetti-code)
+pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut(&[&T])) {
+    /// Return tuple of (a, k, l, n) where 
+    /// - a is a Vec<usize>, array holding index of permuted.
+    /// - k is usize and l is Vec<usize>
+    /// Init value is k = 1
+    /// - l is a Vec<usize>
+    /// Init l[k] = k + 1 where 0 <= k < n
+    /// l[n] = 0
+    /// - n is usize, a length of data
+    /// - perm is Vec<&T>, holding permuted value
+    /// - u is Vec<usize>, holding undo vec 
+    #[inline(always)]
+    fn init<T>(d : &[T]) -> (Vec<usize>, usize, Vec<usize>, usize, Vec<&T>, Vec<usize>) {
+        // l[k] = k + 1 where 0 <= k < n
+        let (mut l, perm) : (Vec<usize>, Vec<&T>) = (0..d.len()).map(|k| (k + 1, &d[0])).unzip();
+        let a : Vec<usize> = (0..=d.len()).map(|v| v).collect();
+        let n = d.len();
+        let u = vec![0; n + 1];
+        
+        // l[n] = 0
+        l.push(0);
+        let k = 1;
+
+        (a, k, l, n, perm, u)
+    };
+
+    /// Return tuple of (p, q) where
+    /// p = 0 and q = l[0]
+    #[inline(always)]
+    fn enter(l : &[usize]) -> (usize, usize) {
+        return (0, l[0])
+    }
+
+    // "Algo X" X1
+    let (mut a, mut k, mut l, n, mut perm, mut u) = init(d);
+    // "Algo X" X2
+    let (mut p, mut q) = enter(&l);
+
+    loop { 
+        // "Algo X" X3
+        perm[k - 1] = &d[q - 1];
+        a[k] = q;
+
+        if t(&perm[0..k]) { // part of "Algo X" X3
+            if k == n { // part of "Algo X" X3
+                cb(&perm); // visit part of "Algo X" X3
+
+                loop { // condition of "Algo X" X5
+                    // "Algo X" X6
+                    k -= 1;
+
+                    if k == 0 {
+                        return;
+                    } else {
+                        p = u[k];
+                        q = a[k];
+                        l[p] = q;
+
+                        // "Algo X" X5
+                        p = q;
+                        q = l[p];
+
+                        if q != 0 {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // "Algo X" X4
+                u[k] = p;
+                l[p] = l[q];
+                k += 1;
+
+                // "Algo X" X2
+                let (new_p, new_q) = enter(&l);
+                p = new_p;
+                q = new_q;
+            }
+        } else {
+            // "Algo X" X5
+            loop {
+                p = q;
+                q = l[p];
+
+                if q != 0 {
+                    break;
+                }
+                
+                // "Algo X" X6
+                k -= 1;
+
+                if k == 0 {
+                    return;
+                } else {
+                    p = u[k];
+                    q = a[k];
+                    l[p] = q;
+                }
+            }
+        }
+    }
+
+    // while (true) {
+    // set(a[k],q);
+    // if(test() == ok) {
+    //     if (k == n) {
+    //     visit();
+    //     } else {
+    //     increase(k);
+    //     enter_level(k);
+    //     continue;
+    //     }
+    // } else {
+    //     increasev2(a[k]);
+    //     if (q != 0) {
+    //     continue; 
+    //     }
+    // }
+    // while (true) {
+    //     decrease(k);
+    //     if (k!=0) {
+    //     set(p,u_k);
+    //     increasev2(a[k]);
+    //     if (q != 0) {
+    //         break; 
+    //     }
+    //     } else {
+    //     return;
+    //     }
+    // }
+    // }
+}
+
 /// A trait that add reset function to an existing Iterator.
 /// It mean that the `next` or `next_into_cell` call will start returning
 /// the first element again
@@ -8592,6 +8732,34 @@ pub mod test {
     }
 
     #[test]
+    fn test_x_permutation() {
+        let data = vec![1, 2, 3, 4];
+        let mut counter = 0;
+
+        x_permutation(&data, |_| true, |p| {
+            println!("{:?}", p);
+            counter += 1;
+        });
+
+        assert_eq!(factorial(data.len()), counter);
+    }
+
+    #[test]
+    fn test_x_permutation_restricted() {
+        let data : Vec<u8> = vec![1, 2, 3, 4];
+        let mut counter = 0;
+
+        x_permutation(&data, |f| {
+            *f[0] != 1u8 // filter all permutation that start with 1
+        }, |p| {
+            println!("{:?}", p);
+            counter += 1;
+        });
+
+        assert_eq!(factorial(data.len()) - factorial(data.len() - 1), counter);
+    }
+
+    #[test]
     #[ignore]
     fn compare_gosper_custom_fn() {
         use std::time::Instant;
@@ -8748,5 +8916,88 @@ pub mod test {
         domains.as_slice().cart_prod().for_each(|_p| {counter += 1});
 
         println!("Total {} permutations done in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_x_perm_st_fn() { // st mean single thread
+        use std::time::Instant;
+
+        let mut data : Vec<u8> = (0..13u8).map(|v| v).collect();
+        let mut counter = 0;
+        let timer = Instant::now();
+
+        x_permutation(&data, |_| true, |_p| {
+            counter += 1;
+        });
+
+        println!("Done {} x_permutation in {:?}", counter, timer.elapsed());
+        counter = 0;
+        let timer = Instant::now();
+
+        heap_permutation(&mut data, |_p| {
+            counter += 1;
+        });
+
+        println!("Done {} heap_permutation in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_x_perm_mt_fn() { // st mean single thread
+        use std::time::{Duration, Instant};
+
+        let mut data : Vec<u8> = (0..13u8).map(|v| v).collect();
+        let threads = 3usize;
+        let chunk = data.len() / threads; // split data into 3 threads.
+        let complete_count = Arc::new(RwLock::new(0u64));
+        let total_counter = Arc::new(RwLock::new(0u64));
+        for i in 0..threads {
+            let u_bound = match i {
+                j if j == threads - 1 => data.len() as u8, // last thread do all the rest
+                _ => (chunk * (i + 1)) as u8
+            };
+            let l_bound = (chunk * i) as u8;
+            println!("thread{}: {}-{}", i, l_bound, u_bound);
+            let perm = get_permutation_for(&data, data.len(), l_bound as usize).unwrap();
+            let t_dat : Vec<u8> = perm.iter().map(|v| **v).collect(); // need to move to each thread
+            let t_counter = Arc::clone(&complete_count); // thread completed count
+            let loc_counter = Arc::clone(&total_counter); // count number of permutation
+            thread::spawn(move || {
+                let mut counter = 0u64;
+                x_permutation(&t_dat, |v| {
+                    *v[0] >= l_bound && *v[0] < u_bound
+                }, |_p| {
+                    counter += 1;
+                });
+
+                *loc_counter.write().unwrap() += counter;
+                println!("Done {} in local thread", counter);
+                *t_counter.write().unwrap() += 1;
+            });
+        }
+
+        let main = thread::spawn(move || {
+            let timer = Instant::now();
+            loop {
+                if *complete_count.read().unwrap() != (threads as u64) {
+                    thread::sleep(Duration::from_millis(100));
+                } else {
+                    println!("Done {} x_permutation {} threads in {:?}", &*total_counter.read().unwrap(), threads, timer.elapsed());
+                    break;
+                }
+            }
+        });
+
+        main.join().unwrap();
+
+        let mut counter = 0u64;
+        let timer = Instant::now();
+
+        heap_permutation(&mut data, |_p| {
+            counter += 1;
+        });
+
+        println!("Done {} heap_permutation in {:?}", counter, timer.elapsed());
     }
 }
