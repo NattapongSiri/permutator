@@ -2759,36 +2759,6 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
             }
         }
     }
-
-    // while (true) {
-    // set(a[k],q);
-    // if(test() == ok) {
-    //     if (k == n) {
-    //     visit();
-    //     } else {
-    //     increase(k);
-    //     enter_level(k);
-    //     continue;
-    //     }
-    // } else {
-    //     increasev2(a[k]);
-    //     if (q != 0) {
-    //     continue; 
-    //     }
-    // }
-    // while (true) {
-    //     decrease(k);
-    //     if (k!=0) {
-    //     set(p,u_k);
-    //     increasev2(a[k]);
-    //     if (q != 0) {
-    //         break; 
-    //     }
-    //     } else {
-    //     return;
-    //     }
-    // }
-    // }
 }
 
 /// A trait that add reset function to an existing Iterator.
