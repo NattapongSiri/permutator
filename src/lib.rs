@@ -2179,39 +2179,6 @@ pub fn k_permutation<'a, T, F>(d : &'a [T], k : usize, mut cb : F)
 
         heap_permutation(&mut result.to_owned(), |r| cb(r));
     });
-    // let n = d.len();
-    // let (ref mut result, ref mut map) = create_k_set(d, k);
-    // let result = result.as_mut_slice();
-
-    // _k_permutation_core! {
-    //     k,
-    //     n, 
-    //     swap_k((result, map), d),
-    //     heap_permutation(result, |permuted| {
-    //         cb(permuted);
-    //     }),
-    //     cb(&*result)
-    // };
-
-    // if d.len() < k {
-    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    // } else if k == 0 {
-    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-    //     return
-    // }
-
-    // let (mut subset, mut map) = create_k_set(d, k); // utility function to create initial subset
-    // cb(&subset);
-    // heap_permutation(&mut subset, |permuted| {
-    //     cb(permuted);
-    // }); // generate all possible permutation for initial subset
-
-    // while let Some(_) = swap_k((&mut subset, &mut map), d) { // repeatly swap element
-    //     cb(&subset);
-    //     heap_permutation(&mut subset, |permuted| {
-    //         cb(permuted);
-    //     }); // generate all possible permutation per each subset
-    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -2321,42 +2288,6 @@ pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut 
         // restore combination so next combination is properly produce
         buffer.iter().enumerate().for_each(|(i, t)| (*result)[i] = *t)
     });
-    // let n = d.len();
-    // let mut map = 0;
-    // unsafe_create_k_set(d, k, result, &mut map);
-    // let result = &mut *result;
-
-    // _k_permutation_core! {
-    //     k,
-    //     n, 
-    //     swap_k((result, &mut map), d),
-    //     heap_permutation(result, |_| {
-    //         cb();
-    //     }),
-    //     cb()
-    // };
-
-    // if d.len() < k {
-    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    // } else if k == 0 {
-    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-    //     return
-    // }
-
-    // let mut map : u128 = 0;
-
-    // unsafe_create_k_set(d, k, result, &mut map); // utility function to create initial subset
-    // cb();
-    // heap_permutation(&mut *result, |_| {
-    //     cb();
-    // }); // generate all possible permutation for initial subset
-
-    // while let Some(_) = swap_k((&mut *result, &mut map), d) { // repeatly swap element
-    //     cb();
-    //     heap_permutation(&mut *result, |_| {
-    //         cb();
-    //     }); // generate all possible permutation per each subset
-    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -2459,40 +2390,6 @@ pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a
         // restore combination so next combination is properly produce
         origin.iter().enumerate().for_each(|(i, t)| result.borrow_mut()[i] = *t)
     });
-    // let n = d.len();
-    // let mut map = 0;
-    // create_k_set_in_cell(d, k, &result, &mut map);
-
-    // _k_permutation_core! {
-    //     k,
-    //     n, 
-    //     swap_k_in_cell((&result, &mut map), d),
-    //     heap_permutation_cell(&result, || {
-    //         cb();
-    //     }),
-    //     cb()
-    // };
-    // if d.len() < k {
-    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    // } else if k == 0 {
-    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-    //     return
-    // }
-
-    // let mut map : u128 = 0;
-
-    // create_k_set_in_cell(d, k, &result, &mut map); // utility function to create initial subset
-    // cb();
-    // heap_permutation_cell(&result, || {
-    //     cb();
-    // }); // generate all possible permutation for initial subset
-
-    // while let Some(_) = swap_k_in_cell((&result, &mut map), d) { // repeatly swap element
-    //     cb();
-    //     heap_permutation_cell(&result, || {
-    //         cb();
-    //     }); // generate all possible permutation per each subset
-    // }
 }
 
 /// Similar to safe [k_permutation function](fn.k_permutation.html) except 
@@ -2615,40 +2512,6 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
         // restore combination so next combination is properly produce
         origin.iter().enumerate().for_each(|(i, t)| result.write().unwrap()[i] = *t)
     });
-    // let n = d.len();
-    // let mut map = 0;
-    // create_k_set_sync(d, k, &result, &mut map);
-
-    // _k_permutation_core! {
-    //     k,
-    //     n, 
-    //     swap_k_sync((&result, &mut map), d),
-    //     heap_permutation_sync(&result, || {
-    //         cb();
-    //     }),
-    //     cb()
-    // };
-    // if d.len() < k {
-    //     panic!("Cannot create k-permutation of size {} for data of length {}", k, d.len());
-    // } else if k == 0 {
-    //     // k = 0 mean mean permutation frame size is 0, it cannot have permutation
-    //     return
-    // }
-
-    // let mut map : u128 = 0;
-
-    // create_k_set_sync(d, k, &result, &mut map); // utility function to create initial subset
-    // cb();
-    // heap_permutation_sync(&result, || {
-    //     cb();
-    // }); // generate all possible permutation for initial subset
-
-    // while let Some(_) = swap_k_sync((&result, &mut map), d) { // repeatly swap element
-    //     cb();
-    //     heap_permutation_sync(&result, || {
-    //         cb();
-    //     }); // generate all possible permutation per each subset
-    // }
 }
 
 /// A lexicographic ordered permutation based on ["Algoritm X" published by
@@ -2658,7 +2521,21 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
 /// He implemented Algorithm X in an structured iterator style.
 /// The discussion on how to implement "Algorithm X" in structured fashion in 
 /// discussed [here](https://stackoverflow.com/questions/37079307/untying-knuths-knots-how-to-restructure-spaghetti-code)
-pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut(&[&T])) {
+/// The implementation here is inspired by the post from stackoverflow.
+/// 
+/// # Parameters
+/// - d : &[T] - a data to be permuted
+/// - result_fn : FnMut(usize, usize) - Function/Closure that responsible for
+/// assign a data into result container. The first parameter is an index of result
+/// to be re-assigned. The second parameter is an index of data to be assigned to result.
+/// - t : FnMut(usize) -> bool - a function defined by "Algorithm X" that get called
+/// by current "prefix" to check if such "prefix" need to be kept. If true, the
+/// "prefix" will be kept. If false, the entire sub-tree with this "prefix" will be skip.
+/// The parameter will be usize which is max bound of current result. The "prefix"
+/// therefore shall be a subslice of range 0 till given parameter. For example,
+/// result[0..k]
+/// - cb : FnMut() - Callback function that shall return result to caller
+fn _x_permutation_core<T>(d : &[T], mut result_fn : impl FnMut(usize, usize), mut t : impl FnMut(usize) -> bool, mut cb : impl FnMut()) {
     /// Return tuple of (a, k, l, n) where 
     /// - a is a Vec<usize>, array holding index of permuted.
     /// - k is usize and l is Vec<usize>
@@ -2670,9 +2547,9 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
     /// - perm is Vec<&T>, holding permuted value
     /// - u is Vec<usize>, holding undo vec 
     #[inline(always)]
-    fn init<T>(d : &[T]) -> (Vec<usize>, usize, Vec<usize>, usize, Vec<&T>, Vec<usize>) {
+    fn init<T>(d : &[T]) -> (Vec<usize>, usize, Vec<usize>, usize, Vec<usize>) {
         // l[k] = k + 1 where 0 <= k < n
-        let (mut l, perm) : (Vec<usize>, Vec<&T>) = (0..d.len()).map(|k| (k + 1, &d[0])).unzip();
+        let mut l : Vec<usize> = (0..d.len()).map(|k| k + 1).collect();
         let a : Vec<usize> = (0..=d.len()).map(|v| v).collect();
         let n = d.len();
         let u = vec![0; n + 1];
@@ -2681,7 +2558,7 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
         l.push(0);
         let k = 1;
 
-        (a, k, l, n, perm, u)
+        (a, k, l, n, u)
     };
 
     /// Return tuple of (p, q) where
@@ -2692,18 +2569,19 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
     }
 
     // "Algo X" X1
-    let (mut a, mut k, mut l, n, mut perm, mut u) = init(d);
+    let (mut a, mut k, mut l, n, mut u) = init(d);
     // "Algo X" X2
     let (mut p, mut q) = enter(&l);
 
     loop { 
         // "Algo X" X3
-        perm[k - 1] = &d[q - 1];
+        // perm[k - 1] = &d[q - 1];
+        result_fn(k - 1, q - 1);
         a[k] = q;
 
-        if t(&perm[0..k]) { // part of "Algo X" X3
+        if t(k) { // part of "Algo X" X3
             if k == n { // part of "Algo X" X3
-                cb(&perm); // visit part of "Algo X" X3
+                cb(); // visit part of "Algo X" X3
 
                 loop { // condition of "Algo X" X5
                     // "Algo X" X6
@@ -2759,6 +2637,193 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
             }
         }
     }
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](fn.heap_permutation.html)
+/// function instead. This function is 3 times slower than heap [heap 
+/// permutation](fn.heap_permutation.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+/// 
+/// # Parameters
+/// - d : &[T] - A data to get a permutation.
+/// - t : FnMut(&[&T]) -> bool - A function for checking whether to traverse the branch.
+/// It shall return true if the branch need to be traversed.
+/// - cb : FnMut(&[&T]) - A callback function that return result to caller.
+pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut(&[&T])) {
+    let mut perm : Vec<&T> = (0..d.len()).map(|i| &d[i]).collect();
+    let perm_ptr = &perm as *const Vec<&T>;
+    _x_permutation_core(
+        d, 
+        |i, j| {
+            perm[i] = &d[j];
+        }, |k| -> bool {
+            unsafe { // should be safe as it got called after it mutated
+                t(&(*perm_ptr)[0..k])
+            }
+        }, || { // should be safe as it got called after it mutated
+            unsafe {
+                cb(&(*perm_ptr))
+            }
+        }
+    )
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](fn.heap_permutation_cell.html)
+/// function instead. This function is 3 times slower than heap [heap 
+/// permutation](fn.heap_permutation_cell.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+/// 
+/// # Parameters
+/// - d : &[T] - A data to get a permutation.
+/// - result : Rc<RefCell<&mut [&T]>> - A result container.
+/// The result will be overwritten on each call to callback. 
+/// - t : FnMut(&[&T]) -> bool - A function for checking whether to traverse the branch.
+/// It shall return true if the branch need to be traversed.
+/// - cb : FnMut() - A callback function that notify caller that new result is available.
+pub fn x_permutation_cell<'a, T>(d : &'a [T], result : Rc<RefCell<&mut [&'a T]>>,mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut()) {
+    assert_eq!(result.borrow().len(), d.len(), "`result` shall has length equals to `d`");
+    { // init result
+        let mut mutable_res = result.borrow_mut();
+        (0..d.len()).for_each(|i| mutable_res[i] = &d[i]);
+    }
+    
+    _x_permutation_core(
+        d, 
+        |i, j| {
+            result.borrow_mut()[i] = &d[j];
+        }, |k| -> bool {
+            t(&result.borrow()[0..k])
+        }, || { // should be safe as it got called after it mutated
+            cb()
+        }
+    )
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](fn.heap_permutation_sync.html)
+/// function instead. This function is 3 times slower than heap [heap 
+/// permutation](fn.heap_permutation_sync.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+/// 
+/// # Parameters
+/// - d : &[T] - A data to get a permutation.
+/// - result : Arc<RwLock<Vec<&T>>> - A result container.
+/// The result will be overwritten on each call to callback. 
+/// - t : FnMut(&[&T]) -> bool - A function for checking whether to traverse the branch.
+/// It shall return true if the branch need to be traversed.
+/// - cb : FnMut() - A callback function that notify caller that new result is available.
+pub fn x_permutation_sync<'a, T>(d : &'a [T], result : Arc<RwLock<Vec<&'a T>>>,mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut()) {
+    assert_eq!(result.read().unwrap().len(), d.len(), "`result` shall has length equals to `d`");
+    { // init result
+        let mut mutable_res = result.write().unwrap();
+        (0..d.len()).for_each(|i| mutable_res[i] = &d[i]);
+    }
+    
+    _x_permutation_core(
+        d, 
+        |i, j| {
+            result.write().unwrap()[i] = &d[j];
+        }, |k| -> bool {
+            t(&result.read().unwrap()[0..k])
+        }, || { // should be safe as it got called after it mutated
+            cb()
+        }
+    )
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](fn.unsafe_heap_permutation.html)
+/// function instead. This function is 3 times slower than heap [heap 
+/// permutation](fn.unsafe_heap_permutation.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+/// 
+/// # Parameters
+/// - d : &[T] - A data to get a permutation.
+/// - result : *mut [&T] - A result container.
+/// The result will be overwritten on each call to callback. 
+/// - t : FnMut(&[&T]) -> bool - A function for checking whether to traverse the branch.
+/// It shall return true if the branch need to be traversed.
+/// - cb : FnMut() - A callback function that notify caller that new result is available.
+/// 
+/// # Safety
+/// This function is unsafe to used. This function store result into raw pointer thus all 
+/// unsafe Rust condition may applied. For example, it may seg fault if pointer is invalid. 
+/// It may cause datarace. It may leak memory.
+/// 
+/// # Rationale
+/// This function permit sharing data to other without cost by sacrifice the safety.
+/// For safely share result in single thread, consider using 
+/// [x_permutation_cell](fn.x_permutation_cell.html). For safely share result in
+/// multi-threads, consider using [x_permutation_sync](fn.x_permutation_sync.html).
+/// Both functions have some cost due to additional safety check.
+pub unsafe fn unsafe_x_permutation<'a, T>(d : &'a [T], result : *mut [&'a T], mut t : impl FnMut(&[&T]) -> bool, mut cb : impl FnMut()) {
+    assert_eq!((*result).len(), d.len(), "`result` shall has length equals to `d`");
+    (0..d.len()).for_each(|i| (*result)[i] = &d[i]);
+    
+    _x_permutation_core(
+        d, 
+        |i, j| {
+            (*result)[i] = &d[j];
+        }, |k| -> bool {
+            t(&(*result)[0..k])
+        }, || { // should be safe as it got called after it mutated
+            cb()
+        }
+    )
 }
 
 /// A trait that add reset function to an existing Iterator.
@@ -8710,6 +8775,53 @@ pub mod test {
             println!("{:?}", p);
             counter += 1;
         });
+
+        assert_eq!(factorial(data.len()), counter);
+    }
+
+    #[test]
+    fn test_x_permutation_cell() {
+        let data = vec![1, 2, 3, 4];
+        let mut result = vec![&data[0]; data.len()];
+        let share = Rc::new(RefCell::new(result.as_mut_slice()));
+        let mut counter = 0;
+
+        x_permutation_cell(&data, Rc::clone(&share), |_| true, || {
+            println!("{:?}", &*share.borrow());
+            counter += 1;
+        });
+
+        assert_eq!(factorial(data.len()), counter);
+    }
+
+    #[test]
+    fn test_x_permutation_sync() {
+        let data = vec![1, 2, 3, 4];
+        let result = vec![&data[0]; data.len()];
+        let share = Arc::new(RwLock::new(result));
+        let mut counter = 0;
+
+        x_permutation_sync(&data, Arc::clone(&share), |_| true, || {
+            println!("{:?}", &*share.read().unwrap());
+            counter += 1;
+        });
+
+        assert_eq!(factorial(data.len()), counter);
+    }
+
+    #[test]
+    fn test_unsafe_x_permutation() {
+        let data = vec![1u8, 2, 3, 4];
+        let mut result = vec![&data[0]; data.len()];
+        let share = result.as_mut_slice() as *mut [&u8];
+        let mut counter = 0;
+
+        unsafe {
+            unsafe_x_permutation(&data, share, |_| true, || {
+                println!("{:?}", result);
+                counter += 1;
+            });
+        }
 
         assert_eq!(factorial(data.len()), counter);
     }
