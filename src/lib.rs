@@ -406,35 +406,6 @@ where T : 'a,
                 cb(&*copied);
             });
     }
-    // let mut more = true;
-    // let n = sets.len() - 1;
-    // let mut i = 0;
-    // let mut c = vec![0; sets.len()];
-    // while more {
-    //     result[i] = &sets[i][c[i]];
-
-    //     if i == n {
-    //         c[i] += 1;
-    //         cb(&result);
-    //     }
-
-    //     if i < n {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == sets[i].len() {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -531,35 +502,6 @@ pub unsafe fn unsafe_cartesian_product<'a, T>(sets : &'a[&[T]], result : *mut [&
         #[inline(always)] |i, c| {
             (*result)[i] = &sets[i][c];
         }, cb);
-    // let mut more = true;
-    // let n = sets.len() - 1;
-    // let mut i = 0;
-    // let mut c = vec![0; sets.len()];
-    // while more {
-    //     (*result)[i] = &sets[i][c[i]];
-
-    //     if i == n {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == sets[i].len() {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -653,35 +595,6 @@ pub fn cartesian_product_cell<'a, T>(sets : &'a[&[T]], result : Rc<RefCell<&'a m
         #[inline(always)] |i, c| {
             result.borrow_mut()[i] = &sets[i][c];
         }, cb);
-    // let mut more = true;
-    // let n = sets.len() - 1;
-    // let mut i = 0;
-    // let mut c = vec![0; sets.len()];
-    // while more {
-    //     result.borrow_mut()[i] = &sets[i][c[i]];
-
-    //     if i == n {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == sets[i].len() {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.cartesian_product.html) 
@@ -785,36 +698,6 @@ pub fn cartesian_product_sync<'a, T>(sets : &'a[&[T]], result : Arc<RwLock<Vec<&
         #[inline(always)] |i, c| {
             result.write().unwrap()[i] = &sets[i][c];
         }, cb);
-    
-    // let mut more = true;
-    // let n = sets.len() - 1;
-    // let mut i = 0;
-    // let mut c = vec![0; sets.len()];
-    // while more {
-    //     result.write().unwrap()[i] = &sets[i][c[i]];
-
-    //     if i == n {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == sets[i].len() {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Create a cartesian product over itself. The result will be a slice
@@ -865,37 +748,6 @@ where T : 'a,
                 cb(&*copied);
             });
     }
-    
-    // let mut result = vec![&set[0]; n];
-    // let mut more = true;
-    // let n_1 = n - 1;
-    // let mut i = 0;
-    // let mut c = vec![0; n];
-    // while more {
-    //     result[i] = &set[c[i]];
-
-    //     if i == n_1 {
-    //         c[i] += 1;
-    //         cb(&result);
-    //     }
-
-    //     if i < n_1 {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == n {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
@@ -994,35 +846,6 @@ pub unsafe fn unsafe_self_cartesian_product<'a, T>(set : &'a[T], n : usize, resu
         #[inline(always)]  |i, c| {
             (*result)[i] = &set[c];
         }, cb);
-    // let mut more = true;
-    // let mut i = 0;
-    // let n_1 = n - 1;
-    // let mut c = vec![0; n];
-    // while more {
-    //     (*result)[i] = &set[c[i]];
-
-    //     if i == n_1 {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n_1 {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == set.len() {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [cartesian_product function](fn.self_cartesian_product.html) 
@@ -1118,35 +941,6 @@ pub fn self_cartesian_product_cell<'a, T>(set : &'a[T], n : usize, result : Rc<R
         #[inline(always)]  |i, c| {
             result.borrow_mut()[i] = &set[c];
         }, cb);
-    // let mut more = true;
-    // let mut i = 0;
-    // let n_1 = n - 1;
-    // let mut c = vec![0; n];
-    // while more {
-    //     result.borrow_mut()[i] = &set[c[i]];
-
-    //     if i == n_1 {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n_1 {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == n {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// Similar to safe [self_cartesian_product function](fn.self_cartesian_product.html) 
@@ -1252,35 +1046,6 @@ pub fn self_cartesian_product_sync<'a, T>(set : &'a[T], n : usize, result : Arc<
         #[inline(always)]  |i, c| {
             result.write().unwrap()[i] = &set[c];
         }, cb);
-    // let mut more = true;
-    // let mut i = 0;
-    // let n_1 = n - 1;
-    // let mut c = vec![0; n];
-    // while more {
-    //     result.write().unwrap()[i] = &set[c[i]];
-
-    //     if i == n_1 {
-    //         c[i] += 1;
-    //         cb();
-    //     }
-
-    //     if i < n_1 {
-    //         i += 1;
-    //     }
-
-    //     while c[i] == n {
-    //         c[i] = 0;
-            
-    //         if i == 0 {
-    //             more = false;
-    //             break;
-    //         }
-
-    //         i -= 1;
-    //         c[i] += 1;
-    //     }
-
-    // }
 }
 
 /// # Deprecated
@@ -1964,25 +1729,6 @@ pub fn heap_permutation<'a, T>(d : &'a mut [T], mut cb : impl FnMut(&[T]) -> () 
                 cb(&*copied)
             });
     }
-    // let n = d.len();
-    // let mut c = vec![0; n];
-    // let mut i = 0;
-    // while i < n {
-    //     if c[i] < i {
-    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-    //             d.swap(0, i);
-    //         } else {
-    //             d.swap(c[i], i);
-    //         }
-
-    //         cb(d);
-    //         c[i] += 1;
-    //         i = 0;
-    //     } else {
-    //         c[i] = 0;
-    //         i += 1;
-    //     }
-    // }
 }
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
@@ -2022,25 +1768,6 @@ pub fn heap_permutation_cell<T>(d : &Rc<RefCell<&mut [T]>>, cb : impl FnMut() ->
         }, 
         cb
     );
-    // let n = d.borrow().len();
-    // let mut c = vec![0; n];
-    // let mut i = 0;
-    // while i < n {
-    //     if c[i] < i {
-    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-    //             d.borrow_mut().swap(0, i);
-    //         } else {
-    //             d.borrow_mut().swap(c[i], i);
-    //         }
-
-    //         cb();
-    //         c[i] += 1;
-    //         i = 0;
-    //     } else {
-    //         c[i] = 0;
-    //         i += 1;
-    //     }
-    // }
 }
 
 /// Heap permutation which permutate variable `d` in place and call `cb` function
@@ -2068,25 +1795,6 @@ pub fn heap_permutation_sync<T>(d : &Arc<RwLock<Vec<T>>>, cb : impl FnMut() -> (
         }, 
         cb
     );
-    // let n = d.read().unwrap().len();
-    // let mut c = vec![0; n];
-    // let mut i = 0;
-    // while i < n {
-    //     if c[i] < i {
-    //         if i & 1 == 0 { // equals to mod 2 because it take only 0 and 1 aka last bit
-    //             d.write().unwrap().swap(0, i);
-    //         } else {
-    //             d.write().unwrap().swap(c[i], i);
-    //         }
-
-    //         cb();
-    //         c[i] += 1;
-    //         i = 0;
-    //     } else {
-    //         c[i] = 0;
-    //         i += 1;
-    //     }
-    // }
 }
 
 /// A macro that perform core logic of k-permutation.
@@ -2658,6 +2366,86 @@ fn _x_permutation_core<T>(d : &[T], mut result_fn : impl FnMut(usize, usize), mu
 /// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
 /// The process goes on until every branch is traversed.
 /// 
+/// # Example
+/// Get all lexicalgraphic ordered permutation
+/// ```Rust
+/// use permutator::x_permutation;
+/// 
+/// let data = vec![1, 2, 3, 4];
+/// let mut counter = 0;
+///
+/// x_permutation(&data, |_| true, |p| {
+///     println!("{:?}", p);
+///     counter += 1;
+/// });
+///
+/// assert_eq!(factorial(data.len()), counter);
+/// ```
+/// Skip all permutation that has `1` in first element. 
+/// ```Rust
+/// use permutator::x_permutation;
+/// 
+/// let data : Vec<u8> = vec![1, 2, 3, 4];
+/// let mut counter = 0;
+///
+/// x_permutation(&data, |f| {
+///     *f[0] != 1u8 // filter all permutation that start with 1
+/// }, |p| {
+///     println!("{:?}", p);
+///     counter += 1;
+/// });
+///
+/// assert_eq!(factorial(data.len()) - factorial(data.len() - 1), counter);
+/// ```
+/// Multi-threads permutation example
+/// ```Rust
+/// use std::sync::{Arc, RwLock};
+/// use permutator::{get_permutation_for, x_permutation};
+/// 
+/// let mut data : Vec<u8> = (0..9u8).map(|v| v).collect();
+/// let threads = 2usize;
+/// let chunk = data.len() / threads; // split data into 3 threads.
+/// let complete_count = Arc::new(RwLock::new(0u64));
+/// let total_counter = Arc::new(RwLock::new(0u64));
+/// for i in 0..threads {
+///     let u_bound = match i {
+///         j if j == threads - 1 => data.len() as u8, // last thread do all the rest
+///         _ => (chunk * (i + 1)) as u8
+///     };
+///     let l_bound = (chunk * i) as u8;
+///     let perm = get_permutation_for(&data, data.len(), l_bound as usize).unwrap();
+///     let t_dat : Vec<u8> = perm.iter().map(|v| **v).collect(); // need to move to each thread
+///     let t_counter = Arc::clone(&complete_count); // thread completed count
+///     let loc_counter = Arc::clone(&total_counter); // count number of permutation
+///     thread::spawn(move || {
+///         let mut counter = 0u64;
+///         x_permutation(&t_dat, |v| {
+///             *v[0] >= l_bound && *v[0] < u_bound
+///         }, |_p| {
+///             counter += 1;
+///         });
+///
+///         *loc_counter.write().unwrap() += counter;
+///         println!("Done {} in local thread", counter);
+///         *t_counter.write().unwrap() += 1;
+///     });
+/// }
+///
+/// let main = thread::spawn(move || {
+///     let timer = Instant::now();
+///     loop {
+///         if *complete_count.read().unwrap() != (threads as u64) {
+///             thread::sleep(Duration::from_millis(100));
+///         } else {
+///             println!("Done {} x_permutation {} threads in {:?}", &*total_counter.read().unwrap(), threads, timer.elapsed());
+///             break;
+///         }
+///     }
+/// });
+///
+/// main.join().unwrap();
+/// ```
+/// 
 /// # Parameters
 /// - d : &[T] - A data to get a permutation.
 /// - t : FnMut(&[&T]) -> bool - A function for checking whether to traverse the branch.
@@ -2700,6 +2488,10 @@ pub fn x_permutation<T>(d : &[T], mut t : impl FnMut(&[&T]) -> bool, mut cb : im
 /// If `t` is called with [4] and it return false, it won't try to traverse deeper even
 /// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
 /// The process goes on until every branch is traversed.
+/// 
+/// # Example
+/// See [x_permutation document](fn.x_permutation.html) for example.
+/// It's the same except the way it return result.
 /// 
 /// # Parameters
 /// - d : &[T] - A data to get a permutation.
@@ -2746,6 +2538,10 @@ pub fn x_permutation_cell<'a, T>(d : &'a [T], result : Rc<RefCell<&mut [&'a T]>>
 /// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
 /// The process goes on until every branch is traversed.
 /// 
+/// # Example
+/// See [x_permutation document](fn.x_permutation.html) for example.
+/// It's the same except the way it return result.
+/// 
 /// # Parameters
 /// - d : &[T] - A data to get a permutation.
 /// - result : Arc<RwLock<Vec<&T>>> - A result container.
@@ -2790,6 +2586,10 @@ pub fn x_permutation_sync<'a, T>(d : &'a [T], result : Arc<RwLock<Vec<&'a T>>>,m
 /// If `t` is called with [4] and it return false, it won't try to traverse deeper even
 /// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
 /// The process goes on until every branch is traversed.
+/// 
+/// # Example
+/// See [x_permutation document](fn.x_permutation.html) for example.
+/// It's the same except the way it return result.
 /// 
 /// # Parameters
 /// - d : &[T] - A data to get a permutation.
@@ -2957,35 +2757,6 @@ impl<'a, T> Iterator for CartesianProductIterator<'a, T> {
     /// 
     /// Return None when exhausted.
     fn next(&mut self) -> Option<Vec<&'a T>> {
-        // // move and set `result` and `c` up until all `domains` processed
-        // while self.i < self.domains.len() && !self.exhausted {
-        //     // if current domain is exhausted.
-        //     if self.c[self.i] == self.domains[self.i].len() {
-        //         // reset all exhausted domain in `result` and `c`
-        //         let mut k = self.i;
-
-        //         // reset all exhausted until either found non-exhausted or reach first domain
-        //         while self.c[k] == self.domains[k].len() && k > 0 {
-        //             self.c[k] = 1;
-        //             self.result[k] = &self.domains[k][0];
-        //             k -= 1;
-        //         }
-
-        //         if k == 0 && self.c[k] == self.domains[k].len() {
-        //             // if first domain is also exhausted then flag it.
-        //             self.exhausted = true;
-        //         } else {
-        //             // otherwise advance c[k] and set result[k] to next value
-        //             self.result[k] = &self.domains[k][self.c[k]];
-        //             self.c[k] += 1;
-        //         }
-        //     } else {
-        //         // non exhausted domain, advance `c` and set result
-        //         self.result[self.i] = &self.domains[self.i][self.c[self.i]];
-        //         self.c[self.i] += 1;
-        //     }
-        //     self.i += 1;
-        // }
         let domains = self.domains;
         let result = &mut self.result;
         _cartesian_next_core(
@@ -3117,36 +2888,6 @@ impl<'a, T> Iterator for CartesianProductCellIter<'a, T> where T : 'a {
                 result[i] = &domains[i][j];
             }
         );
-        
-        // move and set `result` and `c` up until all `domains` processed
-        // while self.i < self.domains.len() && !self.exhausted {
-        //     // if current domain is exhausted.
-        //     if self.c[self.i] == self.domains[self.i].len() {
-        //         // reset all exhausted domain in `result` and `c`
-        //         let mut k = self.i;
-
-        //         // reset all exhausted until either found non-exhausted or reach first domain
-        //         while self.c[k] == self.domains[k].len() && k > 0 {
-        //             self.c[k] = 1;
-        //             result[k] = &self.domains[k][0];
-        //             k -= 1;
-        //         }
-
-        //         if k == 0 && self.c[k] == self.domains[k].len() {
-        //             // if first domain is also exhausted then flag it.
-        //             self.exhausted = true;
-        //         } else {
-        //             // otherwise advance c[k] and set result[k] to next value
-        //             result[k] = &self.domains[k][self.c[k]];
-        //             self.c[k] += 1;
-        //         }
-        //     } else {
-        //         // non exhausted domain, advance `c` and set result
-        //         result[self.i] = &self.domains[self.i][self.c[self.i]];
-        //         self.c[self.i] += 1;
-        //     }
-        //     self.i += 1;
-        // }
 
         if self.exhausted {
             None
@@ -3294,36 +3035,6 @@ impl<'a, T> Iterator for CartesianProductRefIter<'a, T> where T : 'a {
                 result[i] = &domains[i][j];
             }
         );
-    
-        // // move and set `result` and `c` up until all `domains` processed
-        // while self.i < self.domains.len() && !self.exhausted {
-        //     // if current domain is exhausted.
-        //     if self.c[self.i] == self.domains[self.i].len() {
-        //         // reset all exhausted domain in `result` and `c`
-        //         let mut k = self.i;
-
-        //         // reset all exhausted until either found non-exhausted or reach first domain
-        //         while self.c[k] == self.domains[k].len() && k > 0 {
-        //             self.c[k] = 1;
-        //             result[k] = &self.domains[k][0];
-        //             k -= 1;
-        //         }
-
-        //         if k == 0 && self.c[k] == self.domains[k].len() {
-        //             // if first domain is also exhausted then flag it.
-        //             self.exhausted = true;
-        //         } else {
-        //             // otherwise advance c[k] and set result[k] to next value
-        //             result[k] = &self.domains[k][self.c[k]];
-        //             self.c[k] += 1;
-        //         }
-        //     } else {
-        //         // non exhausted domain, advance `c` and set result
-        //         result[self.i] = &self.domains[self.i][self.c[self.i]];
-        //         self.c[self.i] += 1;
-        //     }
-        //     self.i += 1;
-        // }
 
         if self.exhausted {
             None
@@ -3493,18 +3204,6 @@ impl<'a, T> Iterator for CombinationIterator<'a, T> {
         if 128 - self.x.leading_zeros() as usize > self.data.len() {
             return None
         } 
-        // else {
-        //     let mut j = 0;
-        //     let mut mask = self.x;
-        //     while mask > 0 {
-        //         if mask & 1 == 1 {
-        //             combination.push(&self.data[j]);
-        //         }
-
-        //         mask >>= 1;
-        //         j += 1;
-        //     }
-        // }
 
         // stanford_combination(&mut self.x);
         let data = self.data;
