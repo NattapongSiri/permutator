@@ -36,6 +36,18 @@
 //!     });
 //! });
 //! ```
+//! - Getting lexicographically ordered k-permutation where k is 3 and n is 5.
+//! ```
+//! use permutator::{Combination, XPermutationIterator};
+//! let mut data = &[1, 2, 3, 4, 5];
+//! let mut counter = 1;
+//! data.combination(3).for_each(|mut c| {
+//!     XPermutationIterator::new(&c, |_| true).for_each(|p| {
+//!         println!("k-permutation@{}={:?}", counter, p);
+//!         counter += 1;
+//!     });
+//! });
+//! ```
 //! - Cartesian product of set of 3, 4, and 5 respectively
 //! ```
 //! use permutator::{CartesianProductIterator, cartesian_product};
@@ -6239,6 +6251,21 @@ impl<'a, 'b : 'a, T> Permutation<'a> for KPermutationIntoRefParams<'b, T> {
         }
     }
 }
+
+// if GAT is supported by Rust. This is probably how Lex-ordered permutation trait
+// should look like.
+//
+// struct LexicographicallyOrdered;
+//
+// impl<'a, 'b : 'a, T> Permutation<'a> for (&'b [T], LexicographicallyOrdered)
+// {
+//     type Permutator<F> = XPermutationIterator<'a, F, T>;
+//
+//     fn permutation(&'a mut self) -> Self::Permutator {
+//         let (d, ..) = self;
+//         XPermutationIterator::new(d, |_| true)
+//     }
+// }
 
 /// # Deprecated
 /// Superseded by algorithm published by Stanford university
