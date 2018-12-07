@@ -428,6 +428,7 @@ data.cart_prod().for_each(|cp| {
         });
     });
 });
+```
 Generate ordered cartesian product between [1, 2, 3], [4, 5], [6, 7], [8, 9], and [10] then make ordered k-permutation where k = 3 from each cartesian product. Additionally, filter out all permutation that the first element is odd number.
 ```Rust
 use permutator::{CartesianProduct, LargeCombinationIterator, x_permutation};
