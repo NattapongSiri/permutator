@@ -139,27 +139,38 @@ This crate provide 4 functions in 2 modules that serve different usecase.
 - `unsafe_large_combination` unsafe function that return product into mutable pointer given in function parameter
 The different between root module and `copy` module is that the product contains `&T` in root module while in `copy` module contains copied `T`.
 ## Get a permutation from data
+This crate provide two different algorithms. One generate lexicographically ordered permutation. Another generate non-lexicographically ordered permutation but faster.
+
 There are three distinct implementation to get permutation.
 - Iterator that do permutation on data
 - Trait that add function to slice, Vec, etc.
 - Function that call callback function to return each permutation
 ### Iterator
-This crate provides `HeapPermutationIterator`, `HeapPermutationCellIter`, and `HeapPermutationRefIter` structs in both root module and `copy` module that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
-- `HeapPermutationIterator` can be used in any case that performance is least concern.
-- `HeapPermutationCellIter` can be used in case performance is important as well as safety.
-- `HeapPermutationRefIter` can be used in case performance is critical and safety will be handle by caller.
-The only different between root module and `copy` module is that in `copy` module type `T` need to implement `Copy` trait.
+This crate provides `HeapPermutationIterator`, `HeapPermutationCellIter`, `HeapPermutationRefIter`, `XPermutationIterator`, `XPermutationCellIter`, and `XPermutationRefIter` structs in both root module and `copy` module that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
+- `HeapPermutationIterator` can be used in any case that order is not important and performance is least concern.
+- `XPermutationIterator` can be used in any case that order is important and performance is least concern.
+- `HeapPermutationCellIter` can be used in case that order is not important and performance is important as well as safety.
+- `XPermutationCellIter` can be used in case that order is important and performance is important as well as safety.
+- `HeapPermutationRefIter` can be used in case that order is not important, performance is critical and safety will be handle by caller.
+- `XPermutationRefIter` can be used in case that order is important, performance is critical and safety will be handle by caller.
+The different between root module and `copy` module is that in `copy` module type `T` need to implement `Copy` trait.
 Every structs implements `IteratorReset` trait.
 - use `reset` function instead of creating a new Iterator everytime you need to re-iterate.
 ### Trait
 This crate provides `Permutation` trait in root module and `copy` module. It provide basic implementation various types such as generic slice, generic Vec, tuple of `(&'a mut[T], Rc<RefCell<&'a mut[T]>>`, and more type but used for [k-permutation](#get-a-k-permutation-from-data).
 It add `permutation()` function to it and return required iterator based on type of data. For example on generic Vec return `HeapPermutationIterator` but on `(&'a mut [T], Rc<RefCell<&'a mut[T]>>)` return `HeapPermutationCellIter`.
+The trait never return lexicographically ordered permutation iterator.
 ### Callback function
-This crate provide 3 functions in root module that serve different usecase.
+This crate provides 3 functions in root module that return non-lexicographically ordered result which serve different usecase.
 - `heap_permutation` function that return product as callback parameter
 - `heap_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
 - `heap_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
 **There is no heap permutation function family in `copy` module.**
+This crate provides 4 functions in both root module and `copy` module that return lexicographically ordered result which serve different usecase.
+- `x_permutation` function that return lexicographically ordered product as callback parameter
+- `x_permutation_cell` function that return lexicographically ordered product into Rc<RefCell<>> given in function parameter
+- `x_permutation_sync` function that return lexicographically ordered product into Arc<RwLock<>> given in function parameter
+- `unsafe_x_permutation` unsafe function that return product into mutable pointer given in function parameter
 ## Get a k-permutation from data
 There are three implementation to get k-permutations.
 - Iterator that return product
@@ -398,6 +409,50 @@ for _ in kperm {
     // each permutation will be stored in `shared`
     println!("{:?}", &*shared.borrow());
 }
+```
+## Lexicographically ordered operation
+Generate ordered cartesian product between [1, 2, 3], [4, 5], [6, 7], [8, 9], and [10] then make ordered k-permutation where k = 3 from each cartesian product.
+```Rust
+use permutator::{CartesianProduct, LargeCombinationIterator, x_permutation};
+
+let data : &[&[u8]] = &[&[1, 2, 3], &[4, 5], &[6, 7], &[8, 9], &[10]];
+let k = 3;
+
+data.cart_prod().for_each(|cp| {
+    // lexicographically ordered cartesian product in `cp`
+    LargeCombinationIterator::new(&cp, k).for_each(|co| {
+        // lexicographically ordered combination of length 3
+        x_permutation(&co, |_| true, |p| {
+            // lexicographically ordered permutation
+            println!("{:?}", p);
+        });
+    });
+});
+Generate ordered cartesian product between [1, 2, 3], [4, 5], [6, 7], [8, 9], and [10] then make ordered k-permutation where k = 3 from each cartesian product. Additionally, filter out all permutation that the first element is odd number.
+```Rust
+use permutator::{CartesianProduct, LargeCombinationIterator, x_permutation};
+
+let data : &[&[u8]] = &[&[1, 2, 3], &[4, 5], &[6, 7], &[8, 9], &[10]];
+let k = 3;
+
+data.cart_prod().for_each(|cp| {
+    // lexicographically ordered cartesian product in `cp`
+    LargeCombinationIterator::new(&cp, k).for_each(|co| {
+        // lexicographically ordered combination of length 3
+        x_permutation(
+            &co, 
+            // first bit == 1 mean it's odd number
+            // notice *** in front of v ?
+            // that's because the root module always return borrowed value.
+            // to get rid of this, use all operation from `copy` module
+            |v| ***v[0] & 1 != 1, 
+            |p| 
+        {
+            // lexicographically ordered permutation
+            println!("{:?}", p);
+        });
+    });
+});
 ```
 ## Traits that add new function to various types
 `CartesianProduct` trait add `cart_prod` function.

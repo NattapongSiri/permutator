@@ -2,12 +2,12 @@
 name = "permutator"
 categories = ["algorithms"]
 description = "Get a lexicographic cartesian product and lexicographic permutation at any specific index from data. Generate complete lexicographic cartesian product from single or multiple set of data. Generate complete lexicographic combination from data. Generate non-lexicographic permutation and k-permutation."
-documentation = "https://docs.rs/permutator/0.3.2/"
+documentation = "https://docs.rs/permutator/0.3.3/"
 keywords = ["cartesian", "permutation", "combination", "multiple", "k-permutation"]
 license = "BSD-3-Clause"
 readme = "readme.md"
 repository = "https://github.com/NattapongSiri/permutator"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
 
 [lib]
