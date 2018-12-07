@@ -4815,6 +4815,114 @@ impl<'a, T> ExactSizeIterator for KPermutationRefIter<'a, T> {
     }
 }
 
+/// Core logic for XPermutation
+/// 
+/// # Parameters
+/// - `a : Vec<usize>` - A vec that contains an index of data currently put into result.
+/// - `k : usize` - An index of result to be mutated.
+/// - `l : Vec<usize>` - A vec that contains an index of next data to be put into data.
+/// - `n : usize` - Total number of data.
+/// - `p : usize` - An index used for queueing next index or backtrack the traversal.
+/// - `q : usize` - An index of data to be put into result.
+/// - `u : Vec<usize>` - A vec cantains an index of data to be put into result when
+/// algorithm need to be backtracked.
+/// - `result_fn : FnMut(usize, usize)` - Function that mutate result.
+/// - `t : FnMut(usize) -> bool` - Function that will be called to check if the branch
+/// need to be traversed. If it return true, the branch will be traversed. If it return
+/// false, the current branch will be skip and it'll be backtrack one level.
+/// The first usize is an index of result to be mutated.
+/// The second usize is an index of data to be put into result.
+/// 
+/// # Return
+/// An empty `Option`. When it's `Some`, it means the new result is updated. When it's
+/// `None`,  it means there's no next permutation.
+fn _x_permutation_next_core(
+    a : &mut [usize], 
+    k : &mut usize, 
+    l : &mut [usize], 
+    n : usize, 
+    p : &mut usize, 
+    q : &mut usize, 
+    u : &mut [usize], 
+    mut result_fn : impl FnMut(usize, usize), 
+    mut t : impl FnMut(usize) -> bool
+) -> Option<()> 
+{
+    /// Return tuple of (p, q) where
+    /// p = 0 and q = l[0]
+    #[inline(always)]
+    fn enter(l : &[usize]) -> (usize, usize) {
+        return (0, l[0])
+    }
+
+    while *k != 0 { 
+        // "Algo X" X3
+        // perm[k - 1] = &d[q - 1];
+        result_fn(*k - 1, *q - 1);
+        a[*k] = *q;
+
+        if t(*k) { // part of "Algo X" X3
+            if *k == n { // part of "Algo X" X3
+                loop { // condition of "Algo X" X5
+                    // "Algo X" X6
+                    *k -= 1;
+
+                    if *k == 0 {
+                        break;
+                    } else {
+                        *p = u[*k];
+                        *q = a[*k];
+                        l[*p] = *q;
+
+                        // "Algo X" X5
+                        *p = *q;
+                        *q = l[*p];
+
+                        if *q != 0 {
+                            break;
+                        }
+                    }
+                }
+
+                // visit part of "Algo X" X3
+                return Some(());
+            } else {
+                // "Algo X" X4
+                u[*k] = *p;
+                l[*p] = l[*q];
+                *k += 1;
+
+                // "Algo X" X2
+                let (new_p, new_q) = enter(l);
+                *p = new_p;
+                *q = new_q;
+            }
+        } else {
+            // "Algo X" X5
+            loop {
+                *p = *q;
+                *q = l[*p];
+
+                if *q != 0 {
+                    break;
+                }
+                
+                // "Algo X" X6
+                *k -= 1;
+
+                if *k == 0 {
+                    return None;
+                } else {
+                    *p = u[*k];
+                    *q = a[*k];
+                    l[*p] = *q;
+                }
+            }
+        }
+    }
+
+    None
+}
 
 /// A lexicographic ordered permutation based on ["Algoritm X" published by
 /// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
@@ -4975,80 +5083,102 @@ impl<'a, F, T> Iterator for XPermutationIterator<'a, F, T>
     type Item = Vec<&'a T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        /// Return tuple of (p, q) where
-        /// p = 0 and q = l[0]
-        #[inline(always)]
-        fn enter(l : &[usize]) -> (usize, usize) {
-            return (0, l[0])
-        }
+        // /// Return tuple of (p, q) where
+        // /// p = 0 and q = l[0]
+        // #[inline(always)]
+        // fn enter(l : &[usize]) -> (usize, usize) {
+        //     return (0, l[0])
+        // }
 
-        while self.k != 0 { 
-            // "Algo X" X3
-            // perm[k - 1] = &d[q - 1];
-            self.result[self.k - 1] = &self.data[self.q - 1];
-            self.a[self.k] = self.q;
+        // while self.k != 0 { 
+        //     // "Algo X" X3
+        //     // perm[k - 1] = &d[q - 1];
+        //     self.result[self.k - 1] = &self.data[self.q - 1];
+        //     self.a[self.k] = self.q;
 
-            if (self.t)(&self.result[0..self.k]) { // part of "Algo X" X3
-                if self.k == self.n { // part of "Algo X" X3
-                    loop { // condition of "Algo X" X5
-                        // "Algo X" X6
-                        self.k -= 1;
+        //     if (self.t)(&self.result[0..self.k]) { // part of "Algo X" X3
+        //         if self.k == self.n { // part of "Algo X" X3
+        //             loop { // condition of "Algo X" X5
+        //                 // "Algo X" X6
+        //                 self.k -= 1;
 
-                        if self.k == 0 {
-                            break;
-                        } else {
-                            self.p = self.u[self.k];
-                            self.q = self.a[self.k];
-                            self.l[self.p] = self.q;
+        //                 if self.k == 0 {
+        //                     break;
+        //                 } else {
+        //                     self.p = self.u[self.k];
+        //                     self.q = self.a[self.k];
+        //                     self.l[self.p] = self.q;
 
-                            // "Algo X" X5
-                            self.p = self.q;
-                            self.q = self.l[self.p];
+        //                     // "Algo X" X5
+        //                     self.p = self.q;
+        //                     self.q = self.l[self.p];
 
-                            if self.q != 0 {
-                                break;
-                            }
-                        }
-                    }
+        //                     if self.q != 0 {
+        //                         break;
+        //                     }
+        //                 }
+        //             }
 
-                    // visit part of "Algo X" X3
-                    return Some(self.result.to_owned());
-                } else {
-                    // "Algo X" X4
-                    self.u[self.k] = self.p;
-                    self.l[self.p] = self.l[self.q];
-                    self.k += 1;
+        //             // visit part of "Algo X" X3
+        //             return Some(self.result.to_owned());
+        //         } else {
+        //             // "Algo X" X4
+        //             self.u[self.k] = self.p;
+        //             self.l[self.p] = self.l[self.q];
+        //             self.k += 1;
 
-                    // "Algo X" X2
-                    let (new_p, new_q) = enter(&self.l);
-                    self.p = new_p;
-                    self.q = new_q;
-                }
-            } else {
-                // "Algo X" X5
-                loop {
-                    self.p = self.q;
-                    self.q = self.l[self.p];
+        //             // "Algo X" X2
+        //             let (new_p, new_q) = enter(&self.l);
+        //             self.p = new_p;
+        //             self.q = new_q;
+        //         }
+        //     } else {
+        //         // "Algo X" X5
+        //         loop {
+        //             self.p = self.q;
+        //             self.q = self.l[self.p];
 
-                    if self.q != 0 {
-                        break;
-                    }
+        //             if self.q != 0 {
+        //                 break;
+        //             }
                     
-                    // "Algo X" X6
-                    self.k -= 1;
+        //             // "Algo X" X6
+        //             self.k -= 1;
 
-                    if self.k == 0 {
-                        return None;
-                    } else {
-                        self.p = self.u[self.k];
-                        self.q = self.a[self.k];
-                        self.l[self.p] = self.q;
-                    }
+        //             if self.k == 0 {
+        //                 return None;
+        //             } else {
+        //                 self.p = self.u[self.k];
+        //                 self.q = self.a[self.k];
+        //                 self.l[self.p] = self.q;
+        //             }
+        //         }
+        //     }
+        // }
+
+        // None
+        let data = self.data;
+        let result = self.result.as_mut_slice();
+        let result_ptr = &*result as *const [&T];
+        let t = &mut self.t;
+        if let Some(_) = _x_permutation_next_core(
+            &mut self.a, 
+            &mut self.k, 
+            &mut self.l, 
+            self.n, 
+            &mut self.p, 
+            &mut self.q, 
+            &mut self.u, 
+            |k, q| {result[k] = &data[q]},
+            |k| {
+                unsafe {
+                    t(&(*result_ptr)[0..k])
                 }
-            }
+            }) {
+            Some(result.to_owned())
+        } else {
+            None
         }
-
-        None
     }
 }
 
@@ -6658,7 +6788,7 @@ pub mod test {
     #[test]
     fn test_XPermutationIterator() {
         use std::time::{Instant};
-        let mut data : Vec<u32> = (0..12).map(|num| num).collect();
+        let mut data : Vec<u32> = (0..3).map(|num| num).collect();
         let mut permutator = XPermutationIterator::new(&data, |_| true);
         let timer = Instant::now();
         let mut counter = 0;
@@ -6677,7 +6807,7 @@ pub mod test {
     #[test]
     fn test_XPermutationIterator_mt() {
         use std::time::{Instant};
-        let data : Vec<usize> = (0..12).map(|num| num).collect();
+        let data : Vec<usize> = (0..3).map(|num| num).collect();
         let threads = 3;
         let chunk = data.len() / threads;
         let (tx, rx) = mpsc::channel();
