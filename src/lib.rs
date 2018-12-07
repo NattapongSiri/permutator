@@ -4927,9 +4927,9 @@ fn _x_permutation_next_core(
 /// A lexicographic ordered permutation based on ["Algoritm X" published by
 /// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
 /// 
-/// If order is not important, consider using [heap permutation](struct.HeapPermutation.html)
+/// If order is not important, consider using [heap permutation](struct.HeapPermutationIterator.html)
 /// struct instead. This struct is a bit slower (about 10%) than [heap 
-/// permutation](struct.HeapPermutation.html) in uncontroll test environment.
+/// permutation](struct.HeapPermutationIterator.html) in uncontroll test environment.
 /// 
 /// The algorithm work by simulate tree traversal where some branch can be 
 /// skip altogether. This is archive by provided `t` function that take 
@@ -5083,80 +5083,6 @@ impl<'a, F, T> Iterator for XPermutationIterator<'a, F, T>
     type Item = Vec<&'a T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // /// Return tuple of (p, q) where
-        // /// p = 0 and q = l[0]
-        // #[inline(always)]
-        // fn enter(l : &[usize]) -> (usize, usize) {
-        //     return (0, l[0])
-        // }
-
-        // while self.k != 0 { 
-        //     // "Algo X" X3
-        //     // perm[k - 1] = &d[q - 1];
-        //     self.result[self.k - 1] = &self.data[self.q - 1];
-        //     self.a[self.k] = self.q;
-
-        //     if (self.t)(&self.result[0..self.k]) { // part of "Algo X" X3
-        //         if self.k == self.n { // part of "Algo X" X3
-        //             loop { // condition of "Algo X" X5
-        //                 // "Algo X" X6
-        //                 self.k -= 1;
-
-        //                 if self.k == 0 {
-        //                     break;
-        //                 } else {
-        //                     self.p = self.u[self.k];
-        //                     self.q = self.a[self.k];
-        //                     self.l[self.p] = self.q;
-
-        //                     // "Algo X" X5
-        //                     self.p = self.q;
-        //                     self.q = self.l[self.p];
-
-        //                     if self.q != 0 {
-        //                         break;
-        //                     }
-        //                 }
-        //             }
-
-        //             // visit part of "Algo X" X3
-        //             return Some(self.result.to_owned());
-        //         } else {
-        //             // "Algo X" X4
-        //             self.u[self.k] = self.p;
-        //             self.l[self.p] = self.l[self.q];
-        //             self.k += 1;
-
-        //             // "Algo X" X2
-        //             let (new_p, new_q) = enter(&self.l);
-        //             self.p = new_p;
-        //             self.q = new_q;
-        //         }
-        //     } else {
-        //         // "Algo X" X5
-        //         loop {
-        //             self.p = self.q;
-        //             self.q = self.l[self.p];
-
-        //             if self.q != 0 {
-        //                 break;
-        //             }
-                    
-        //             // "Algo X" X6
-        //             self.k -= 1;
-
-        //             if self.k == 0 {
-        //                 return None;
-        //             } else {
-        //                 self.p = self.u[self.k];
-        //                 self.q = self.a[self.k];
-        //                 self.l[self.p] = self.q;
-        //             }
-        //         }
-        //     }
-        // }
-
-        // None
         let data = self.data;
         let result = self.result.as_mut_slice();
         let result_ptr = &*result as *const [&T];
@@ -5203,6 +5129,272 @@ impl<'a, F, T> IteratorReset for XPermutationIterator<'a, F, T>
 }
 
 impl<'a, F, T> ExactSizeIterator for XPermutationIterator<'a, F, T>
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](struct.HeapPermutationCellIter.html)
+/// struct instead. This struct is a bit slower (about 10%) than [heap 
+/// permutation](struct.HeapPermutationCellIter.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+pub struct XPermutationCellIter<'a, F, T> 
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a 
+{
+    a : Vec<usize>,
+    data : &'a [T],
+    k : usize, 
+    l : Vec<usize>, 
+    len : usize,
+    n : usize, 
+    p : usize, 
+    q : usize,
+    result : Rc<RefCell<&'a mut [&'a T]>>,
+    t: F,
+    u : Vec<usize>, 
+}
+
+impl<'a, F, T> XPermutationCellIter<'a, F, T>
+    where F : FnMut(&[&T]) -> bool,
+          T : 'a
+{
+    /// Construct new XPermutationIterator object.
+    /// 
+    /// # Parameters
+    /// - `data : &[T]` - A data used for generate permutation.
+    /// - `result : Rc<RefCell<&mut [&T]>>` - A result container.
+    /// It'll be overwritten on each call to `next`
+    /// - `t : FnMut(&[&T])` - A function that if return true, will
+    /// make algorithm continue traversing the tree. Otherwise,
+    /// the entire branch will be skip.
+    pub fn new(data : &'a [T], result : Rc<RefCell<&'a mut [&'a T]>>, t : F) -> XPermutationCellIter<'a, F, T> {
+        let n = data.len();
+        let mut l : Vec<usize> = (0..n).map(|k| k + 1).collect();
+        
+        // l[n] = 0
+        l.push(0);
+
+        // "Algo X" X1 and X2
+        XPermutationCellIter {
+            a : (0..=n).map(|v| v).collect(),
+            data : data,
+            k : 1,
+            l : l,
+            len : factorial(n),
+            n : n,
+            p : 0,
+            q : 1,
+            result : result,
+            t : t,
+            u : vec![0; n + 1]
+        }
+    }
+}
+
+impl<'a, F, T> Iterator for XPermutationCellIter<'a, F, T> 
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    type Item = ();
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let data = self.data;
+        let mut result = self.result.borrow_mut();
+        let result_ptr = (&**result) as *const [&T];
+        let t = &mut self.t;
+        if let Some(_) = _x_permutation_next_core(
+            &mut self.a, 
+            &mut self.k, 
+            &mut self.l, 
+            self.n, 
+            &mut self.p, 
+            &mut self.q, 
+            &mut self.u, 
+            |k, q| {result[k] = &data[q]},
+            |k| {
+                unsafe {
+                    t(&(*result_ptr)[0..k])
+                }
+            }) {
+            Some(())
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, F, T> IteratorReset for XPermutationCellIter<'a, F, T>
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    fn reset(&mut self) {
+        let n = self.data.len();
+        let mut l : Vec<usize> = (0..n).map(|k| k + 1).collect();
+        
+        // l[n] = 0
+        l.push(0);
+
+        self.a = (0..=n).map(|v| v).collect();
+        self.k = 1;
+        self.l = l;
+        self.p = 0;
+        self.q = 1;
+        self.u = vec![0; n + 1];
+    }
+}
+
+impl<'a, F, T> ExactSizeIterator for XPermutationCellIter<'a, F, T>
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+/// A lexicographic ordered permutation based on ["Algoritm X" published by
+/// Donald E. Knuth.](http://www.cs.utsa.edu/~wagner/knuth/fasc2b.pdf) page 20.
+/// 
+/// If order is not important, consider using [heap permutation](struct.HeapPermutationRefIter.html)
+/// struct instead. This struct is a bit slower (about 10%) than [heap 
+/// permutation](struct.HeapPermutationRefIter.html) in uncontroll test environment.
+/// 
+/// The algorithm work by simulate tree traversal where some branch can be 
+/// skip altogether. This is archive by provided `t` function that take 
+/// slice of partial result as parameter. If the partial result needed to be skip,
+/// return false. Otherwise, return true and the algorithm will call this function
+/// again when the branch is descended deeper. For example: First call to `t` may
+/// contain [1]. If `t` return true, it will be called again with [1, 2]. If it
+/// return true, and there's leaf node, cb will be called with [1, 2]. On the other hand,
+/// if `t` is called with [1, 3] and it return false, it won't call the callback.
+/// If `t` is called with [4] and it return false, it won't try to traverse deeper even
+/// if there're [4, 5], or [4, 6]. It will skip altogether and call `t` with [7].
+/// The process goes on until every branch is traversed.
+pub struct XPermutationRefIter<'a, F, T> 
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a 
+{
+    a : Vec<usize>,
+    data : &'a [T],
+    k : usize, 
+    l : Vec<usize>, 
+    len : usize,
+    n : usize, 
+    p : usize, 
+    q : usize,
+    result : &'a mut [&'a T],
+    t: F,
+    u : Vec<usize>, 
+}
+
+impl<'a, F, T> XPermutationRefIter<'a, F, T>
+    where F : FnMut(&[&T]) -> bool,
+          T : 'a
+{
+    /// Construct new XPermutationIterator object.
+    /// 
+    /// # Parameters
+    /// - `data : &[T]` - A data used for generate permutation.
+    /// - `result : Rc<RefCell<&mut [&T]>>` - A result container.
+    /// It'll be overwritten on each call to `next`
+    /// - `t : FnMut(&[&T])` - A function that if return true, will
+    /// make algorithm continue traversing the tree. Otherwise,
+    /// the entire branch will be skip.
+    pub unsafe fn new(data : &'a [T], result : *mut [&'a T], t : F) -> XPermutationRefIter<'a, F, T> {
+        let n = data.len();
+        let mut l : Vec<usize> = (0..n).map(|k| k + 1).collect();
+        
+        // l[n] = 0
+        l.push(0);
+
+        // "Algo X" X1 and X2
+        XPermutationRefIter {
+            a : (0..=n).map(|v| v).collect(),
+            data : data,
+            k : 1,
+            l : l,
+            len : factorial(n),
+            n : n,
+            p : 0,
+            q : 1,
+            result : &mut *result,
+            t : t,
+            u : vec![0; n + 1]
+        }
+    }
+}
+
+impl<'a, F, T> Iterator for XPermutationRefIter<'a, F, T> 
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    type Item = ();
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let data = self.data;
+        let result = &mut *self.result;
+        let result_ptr = (&*result) as *const [&T];
+        let t = &mut self.t;
+        if let Some(_) = _x_permutation_next_core(
+            &mut self.a, 
+            &mut self.k, 
+            &mut self.l, 
+            self.n, 
+            &mut self.p, 
+            &mut self.q, 
+            &mut self.u, 
+            |k, q| {result[k] = &data[q]},
+            |k| {
+                unsafe {
+                    t(&(*result_ptr)[0..k])
+                }
+            }) {
+            Some(())
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, F, T> IteratorReset for XPermutationRefIter<'a, F, T>
+    where F : FnMut(&[&T]) -> bool, 
+          T : 'a
+{
+    fn reset(&mut self) {
+        let n = self.data.len();
+        let mut l : Vec<usize> = (0..n).map(|k| k + 1).collect();
+        
+        // l[n] = 0
+        l.push(0);
+
+        self.a = (0..=n).map(|v| v).collect();
+        self.k = 1;
+        self.l = l;
+        self.p = 0;
+        self.q = 1;
+        self.u = vec![0; n + 1];
+    }
+}
+
+impl<'a, F, T> ExactSizeIterator for XPermutationRefIter<'a, F, T>
     where F : FnMut(&[&T]) -> bool, 
           T : 'a
 {
@@ -6800,6 +6992,48 @@ pub mod test {
 
         assert_eq!(factorial(data.len()), counter);
         println!("Done {} permutations in {:?}", counter, timer.elapsed());
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_XPermutationCellIter() {
+        use std::time::{Instant};
+        let mut data : Vec<u32> = (0..3).map(|num| num).collect();
+        let mut result = vec![&data[0]; data.len()];
+        let share = Rc::new(RefCell::new(result.as_mut_slice()));
+        let mut permutator = XPermutationCellIter::new(&data, Rc::clone(&share), |_| true);
+        let timer = Instant::now();
+        let mut counter = 0;
+
+        while let Some(_) = permutator.next() {
+            println!("{}:{:?}", counter, &*share.borrow());
+            counter += 1;
+        }
+
+        assert_eq!(factorial(data.len()), counter);
+        println!("Done {} permutations in {:?}", counter, timer.elapsed());
+    }
+
+    #[allow(non_snake_case, unused)]
+    #[test]
+    fn test_XPermutationRefIter() {
+        use std::time::{Instant};
+        let mut data : Vec<u32> = (0..3).map(|num| num).collect();
+        let mut result = vec![&data[0]; data.len()];
+        let share = result.as_mut_slice() as *mut [&u32];
+        unsafe {
+            let mut permutator = XPermutationRefIter::new(&data, share, |_| true);
+            let timer = Instant::now();
+            let mut counter = 0;
+
+            while let Some(_) = permutator.next() {
+                println!("{}:{:?}", counter, result);
+                counter += 1;
+            }
+
+            assert_eq!(factorial(data.len()), counter);
+            println!("Done {} permutations in {:?}", counter, timer.elapsed());
+        }
     }
 
     #[allow(non_snake_case, unused)]
