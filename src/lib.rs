@@ -8952,6 +8952,41 @@ pub mod test {
 
     #[test]
     #[ignore]
+    fn test_lex_family() {
+        let data : &[&[u8]] = &[&[1, 2, 3], &[4, 5], &[6, 7], &[8, 9], &[10]];
+        let k = 3;
+
+        data.cart_prod().for_each(|cp| {
+            // lexicographically ordered cartesian product in `cp`
+            LargeCombinationIterator::new(&cp, k).for_each(|co| {
+                // lexicographically ordered combination of length 3
+                x_permutation(&co, |_| true, |p| {
+                    // lexicographically ordered permutation
+                    println!("{:?}", p);
+                });
+            });
+        });
+
+        // generate k-permutation that first element is even number out of 
+        // cartesian product.
+        data.cart_prod().for_each(|cp| {
+            // lexicographically ordered cartesian product in `cp`
+            LargeCombinationIterator::new(&cp, k).for_each(|co| {
+                // lexicographically ordered combination of length 3
+                x_permutation(
+                    &co, 
+                    |v| ***v[0] & 1 != 1, 
+                    |p| 
+                {
+                    // lexicographically ordered permutation
+                    println!("{:?}", p);
+                });
+            });
+        });
+    }
+
+    #[test]
+    #[ignore]
     fn compare_gosper_custom_fn() {
         use std::time::Instant;
         let data : Vec<i32> = (0..30i32).map(|i| {i}).collect();
