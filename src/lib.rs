@@ -7129,27 +7129,6 @@ pub mod test {
 
     #[allow(non_snake_case, unused)]
     #[test]
-    fn test_HeapPermutationIterator() {
-        use std::time::{Instant};
-        let mut data : Vec<u32> = (0..12).map(|num| num).collect();
-        let n = data.len();
-        // let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        // println!("0:{:?}", data);
-        let permutator = HeapPermutationIterator::new(&mut data);
-        let timer = Instant::now();
-        let mut counter = 1;
-
-        for permutated in permutator {
-            // println!("{}:{:?}", counter, permutated);
-            counter += 1;
-        }
-
-        println!("Done {} permutations in {:?}", counter, timer.elapsed());
-        assert_eq!(factorial(n), counter);
-    }
-
-    #[allow(non_snake_case, unused)]
-    #[test]
     fn test_HeapPermutationIntoIterator() {
         use std::time::{Instant};
         let mut data : Vec<String> = (1..=3).map(|num| {format!("some ridiculously long word prefix without any point{}", num)}).collect();
@@ -7701,12 +7680,13 @@ pub mod test {
     fn test_KPermutation_single() {
         let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
         let mut counter = 0;
-        (&*data, 1usize).permutation().for_each(|_p| {
+        let k = 1usize;
+        (&*data, k).permutation().for_each(|_p| {
             println!("{:?}", _p);
             counter += 1;
         });
 
-        assert_eq!(counter, divide_factorial(data.len(), data.len() - 3));
+        assert_eq!(counter, divide_factorial(data.len(), data.len() - k));
     }
 
     #[allow(non_snake_case)]
