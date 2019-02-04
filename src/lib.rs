@@ -114,6 +114,13 @@
 //! # See
 //! - [Github repository for more examples](https://github.com/NattapongSiri/permutator)
 //! 
+//! # Note
+//! - There's some different between using Heap permutation and using
+//! KPermutation with k == n. Heap permutation doesn't return original data.
+//! KPermutation on the other hand, also return original data.
+//! This is because when k < n, the first k-permuted value is of first 
+//! k data which when k == n, first k data is entire data.
+//! 
 //! # Found a bug ?
 //! Open issue at [Github](https://github.com/NattapongSiri/permutator)
 
