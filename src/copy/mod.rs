@@ -1,5 +1,5 @@
 //! A module that perform everything in copy fashion.
-//! There is no heap_permutation callback family function in
+//! There is no Heap permutation family function in
 //! here because that function family already return a slice of
 //! value.
 //! 
@@ -36,17 +36,18 @@
 //! 
 //! Note: All Iterator that return an owned item
 //! still return the same owned item, e.g. Vec<T>
+// use core::future::Future;
 use std::cell::RefCell;
 use std::collections::{VecDeque};
-use std::iter::{ExactSizeIterator, Iterator};
+use std::iter::{Chain, ExactSizeIterator, Iterator};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+use std::vec::{IntoIter};
 use super::{
     _cartesian_product_core, 
     _cartesian_next_core,
     _core_large_combination,
     _gosper_next_core,
-    _heap_next_core,
     _k_permutation_next_core,
     _large_comb_next_core,
     _x_permutation_core,
@@ -55,6 +56,9 @@ use super::{
     divide_factorial,
     factorial,
     get_cartesian_size,
+    HeapPermutationCellIter,
+    HeapPermutationIterator,
+    HeapPermutationRefIter,
     heap_permutation,
     heap_permutation_cell,
     heap_permutation_sync,
@@ -1559,8 +1563,6 @@ pub fn k_permutation<T>(d : &[T], k : usize, mut cb : impl FnMut(&[T]) -> ()) wh
     assert!(k <= d.len());
 
     large_combination(d, k, move |result| {
-        cb(result);
-
         heap_permutation(&mut result.to_owned(), |r| cb(r));
     });
 }
@@ -1658,8 +1660,6 @@ pub unsafe fn unsafe_k_permutation<'a, T>(d : &'a [T], k : usize, result : *mut 
     assert!(k <= d.len(), "'k' is larger than number of data");
 
     unsafe_large_combination(d, k, result, || {
-        cb();
-
         // save combination
         let buffer = (*result).to_owned();
         
@@ -1759,8 +1759,6 @@ pub fn k_permutation_cell<'a, T>(d : &'a [T], k : usize, result : Rc<RefCell<&'a
     assert!(k <= d.len());
 
     large_combination_cell(d, k, Rc::clone(&result), || {
-        cb();
-
         // save combination
         let origin = (*result).borrow().to_owned();
         
@@ -1883,8 +1881,6 @@ pub fn k_permutation_sync<'a, T>(d : &'a [T], k : usize, result : Arc<RwLock<Vec
     assert!(k <= d.len());
     
     large_combination_sync(d, k, Arc::clone(&result), || {
-        cb();
-
         // save combination
         let origin = (*result).read().unwrap().to_owned();
         
@@ -3353,287 +3349,6 @@ impl<'a, T> IteratorReset for LargeCombinationRefIter<'a, T> where T : 'a + Copy
 impl<'a, T> ExactSizeIterator for LargeCombinationRefIter<'a, T> where T : 'a + Copy {
     fn len(&self) -> usize {
         self.len
-    }
-}
-
-/// Heap's permutation in iterator style implementation.
-/// 
-/// # Examples
-/// Iterator style usage example:
-/// ```
-///    use permutator::copy::HeapPermutationIterator;
-///    use std::time::{Instant};
-///    let data = &mut [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-///    println!("0:{:?}", data);
-///    let mut permutator = HeapPermutationIterator::new(data);
-///    let timer = Instant::now();
-///    let mut counter = 1;
-///
-///    for permutated in permutator {
-///        // println!("{}:{:?}", counter, permutated);
-///        counter += 1;
-///    }
-/// 
-///    // or use iterator related functional approach like line below.
-///    // permutator.into_iter().for_each(|permutated| {counter += 1;});
-///
-///    println!("Done {} permutations in {:?}", counter, timer.elapsed());
-/// ```
-/// # See
-/// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
-pub struct HeapPermutationIterator<'a, T> where T : 'a + Copy {
-    c : Box<[usize]>,
-    data : &'a mut [T],
-    i : usize
-}
-
-impl<'a, T> HeapPermutationIterator<'a, T> where T : Copy {
-    /// Construct a new permutation iterator.
-    /// Note: the provided parameter will get mutated
-    /// in placed at first call to next.
-    pub fn new(data : &mut [T]) -> HeapPermutationIterator<T> {
-        HeapPermutationIterator {
-            c : vec![0; data.len()].into_boxed_slice(),
-            data : data,
-            i : 0
-        }
-    }
-
-    /// Consume itself immediately return it.
-    /// It mimic how `IntoIterator` trait perform except
-    /// that this struct itself implement `Iterator` trait.
-    pub fn into_iter(self) -> Self {
-        self
-    }
-}
-
-impl<'a, T> Iterator for HeapPermutationIterator<'a, T> where T : Copy {
-    type Item = Vec<T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let HeapPermutationIterator {ref mut c, ref mut data, ref mut i } = self;
-        let n = data.len();
-        let mut result : Option<Vec<T>> = None;
-        _heap_next_core(c, i, n, 
-            #[inline(always)]
-            |from, to| {
-                data.swap(from, to);
-                result = Some(data.to_owned());
-            }
-        );
-
-        result
-    }
-}
-
-impl<'a, T> IteratorReset for HeapPermutationIterator<'a, T> where T : Copy {
-    /// Reset this permutator so calling next will continue
-    /// permutation on current permuted data.
-    /// It will not reset permuted data.
-    fn reset(&mut self) {
-        self.i = 0;
-        self.c.iter_mut().for_each(|c| {*c = 0;});
-    }
-}
-
-impl<'a, T> ExactSizeIterator for HeapPermutationIterator<'a, T> where T : Copy {
-    fn len(&self) -> usize {
-        factorial(self.data.len())
-    }
-}
-
-/// Heap's permutation in Rc<RefCell<>> mimic Iterator style.
-/// It provides another choice for user that want to share 
-/// permutation result but doesn't want to clone it for 
-/// each share. It also doesn't create new result on each
-/// iteration unlike other object that implement `Iterator` trait.
-/// # Rationale
-/// Unlike all other struct, HeapPermutationIterator permute value in place.
-/// If HeapPermutationIterator struct implement IteratorCell itself will
-/// result in the `data` inside struct left unused.
-/// This struct introduce the same concept to other struct that 
-/// implement `IteratorCell`, to be able to easily share
-/// result with as less performance overhead as possible.
-/// 
-/// The implementation take Rc<RefCell<&mut [T]>> instead of regular
-/// slice like other permutation struct.
-/// It implements `Iterator` trait with empty associated type because
-/// it doesn't return value. It permutes the data in place thus
-/// every owner of Rc<RefCell<&mut [T]>> will always has an up-to-date
-/// slice.
-/// # Examples
-/// Iterator style usage example:
-/// ```
-///    use permutator::copy::HeapPermutationCellIter;
-///    use std::cell::RefCell;
-///    use std::rc::Rc;
-///    use std::time::{Instant};
-///    let data : &mut [i32] = &mut [1, 2, 3, 4, 5];
-///    let shared = Rc::new(RefCell::new(data));
-///    let mut permutator = HeapPermutationCellIter::new(Rc::clone(&shared));
-///    println!("0:{:?}", &*shared.borrow());
-///    let timer = Instant::now();
-///    let mut counter = 1;
-///
-///    for _ in permutator { // it return empty
-///        println!("{}:{:?}", counter, &*shared.borrow());
-///        counter += 1;
-///    }
-/// 
-///    // or use iterator related functional approach like line below.
-///    // permutator.into_iter().for_each(|_| {
-///    //     println!("{}:{:?}", counter, &*data.borrow());
-///    //     counter += 1;
-///    // });
-///
-///    println!("Done {} permutations in {:?}", counter, timer.elapsed());
-/// ```
-/// # See
-/// - [HeapPermutationIterator struct](struct.HeapPermutationIterator.html)
-pub struct HeapPermutationCellIter<'a, T> where T : 'a + Copy {
-    c : Vec<usize>,
-    data : Rc<RefCell<&'a mut[T]>>,
-    i : usize
-}
-
-impl<'a, T> HeapPermutationCellIter<'a, T> where T : Copy {
-    /// Construct a new permutation iterator.
-    /// Note: the provided parameter will get mutated
-    /// in placed at first call to next.
-    pub fn new(data : Rc<RefCell<&'a mut[T]>>) -> HeapPermutationCellIter<'a, T> {
-        HeapPermutationCellIter {
-            c : vec![0; data.borrow().len()],
-            data : Rc::clone(&data),
-            i : 0
-        }
-    }
-}
-
-impl<'a, T> Iterator for HeapPermutationCellIter<'a, T> where T : 'a + Copy {
-    type Item= ();
-
-    fn next(&mut self) -> Option<()> {
-        let HeapPermutationCellIter {ref mut c, ref mut data, ref mut i } = self;
-        let n = data.borrow().len();
-        let mut result : Option<()> = None;
-        _heap_next_core(c, i, n, 
-            #[inline(always)]
-            |from, to| {
-                data.borrow_mut().swap(from, to);
-                result = Some(());
-            }
-        );
-
-        result
-    }
-}
-
-impl<'a, T> IteratorReset for HeapPermutationCellIter<'a, T> where T : Copy {
-    /// Reset this permutator so calling next will continue
-    /// permutation on current permuted data.
-    /// It will not reset permuted data.
-    fn reset(&mut self) {
-        self.i = 0;
-        self.c.iter_mut().for_each(|c| {*c = 0;});
-    }
-}
-
-impl<'a, T> ExactSizeIterator for HeapPermutationCellIter<'a, T> where T : Copy {
-    fn len(&self) -> usize {
-        factorial(self.data.borrow().len())
-    }
-}
-
-/// An unsafe Heap's permutation in iterator style implementation.
-/// 
-/// # Examples
-/// - Iterator style usage example:
-/// ```
-///    use permutator::copy::HeapPermutationRefIter;
-///    use std::time::{Instant};
-///    let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
-///    println!("0:{:?}", data);
-///    unsafe {
-///         let mut permutator = HeapPermutationRefIter::new(data as *mut[i32]);
-///         let timer = Instant::now();
-///         let mut counter = 1;
-///
-///         for permutated in permutator {
-///             println!("{}:{:?}", counter, permutated);
-///             counter += 1;
-///         }
-/// 
-///         // or use iterator related functional approach like line below.
-///         // permutator.into_iter().for_each(|permutated| {counter += 1;});
-///
-///         println!("Done {} permutations in {:?}", counter, timer.elapsed());
-///    }
-/// ```
-/// In test environment, given a slice of 8 strings. It has about 40 characters each.
-/// This implementation is about 70 times (33ms vs 0.47ms) faster than a [HeapPermutation](struct.HeapPermutation.html)
-/// iteration. This is because each `next` function doesn't clone/copy the value.  
-/// However, this implementation limited the way to use data because each iteration
-/// permute the result in place. It require user to manually sync the share operation.
-/// # See
-/// - [Heap's algorithm in Wikipedia page, October 9, 2018](https://en.wikipedia.org/wiki/Heap%27s_algorithm)
-pub struct HeapPermutationRefIter<'a, T> where T : 'a + Copy {
-    c : Vec<usize>,
-    data : &'a mut [T],
-    i : usize
-}
-
-impl<'a, T> HeapPermutationRefIter<'a, T> where T : Copy {
-    /// Construct a new permutation iterator.
-    /// Note: the provided parameter will get mutated
-    /// in placed at first call to next.
-    pub unsafe fn new(data : *mut [T]) -> HeapPermutationRefIter<'a, T> {
-        HeapPermutationRefIter {
-            c : vec![0; (*data).len()],
-            data : &mut *data,
-            i : 0
-        }
-    }
-
-    /// Consume itself immediately return it.
-    /// It mimic how `IntoIterator` trait perform except
-    /// that this struct itself implement `Iterator` trait.
-    pub fn into_iter(self) -> Self {
-        self
-    }
-}
-
-impl<'a, T> Iterator for HeapPermutationRefIter<'a, T> where T : Copy {
-    type Item = ();
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let HeapPermutationRefIter {ref mut c, ref mut data, ref mut i } = self;
-        let n = data.len();
-        let mut result : Option<()> = None;
-        _heap_next_core(c, i, n, 
-            #[inline(always)]
-            |from, to| {
-                data.swap(from, to);
-                result = Some(());
-            }
-        );
-
-        result
-    }
-}
-
-impl<'a, T> IteratorReset for HeapPermutationRefIter<'a, T> where T : Copy {
-    /// Reset this permutator so calling next will continue
-    /// permutation on current permuted data.
-    /// It will not reset permuted data.
-    fn reset(&mut self) {
-        self.i = 0;
-        self.c.iter_mut().for_each(|c| {*c = 0;});
-    }
-}
-
-impl<'a, T> ExactSizeIterator for HeapPermutationRefIter<'a, T> where T : Copy {
-    fn len(&self) -> usize {
-        factorial(self.data.len())
     }
 }
 
@@ -5229,63 +4944,91 @@ pub trait Permutation<'a> {
 
 /// Generate permutation on an array or slice of T
 /// It return [HeapPermutation](struct.HeapPermutationIterator.html)
+/// but it include an original value as first value return by `Iterator`.
+/// 
+/// # Breaking change from 0.3.x to 0.4
+/// Since version 0.4.0, the first result return by this iterator
+/// will be the original value
 impl<'a, T> Permutation<'a> for [T] where T : 'a + Copy {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = HeapPermutationIterator<'a, T>;
+    type Permutator = Chain<IntoIter<Vec<T>>, HeapPermutationIterator<'a, T>>;
 
-    fn permutation(&'a mut self) -> HeapPermutationIterator<T> {
-        HeapPermutationIterator::new(self)
+    fn permutation(&'a mut self) -> Chain<IntoIter<Vec<T>>, HeapPermutationIterator<'a, T>> {
+        let origin = vec![self.to_owned()];
+        origin.into_iter().chain(HeapPermutationIterator::new(self))
     }
 }
 
 /// Generate permutation on a Vec of T
 /// It return [HeapPermutation](struct.HeapPermutationIterator.html)
+/// but it include an original value as first value return by `Iterator`.
+/// 
+/// # Breaking change from 0.3.x to 0.4
+/// Since version 0.4.0, the first result return by this iterator
+/// will be the original value
 impl<'a, T> Permutation<'a> for Vec<T> where T : 'a + Copy {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = HeapPermutationIterator<'a, T>;
+    type Permutator = Chain<IntoIter<Vec<T>>, HeapPermutationIterator<'a, T>>;
 
-    fn permutation(&'a mut self) -> HeapPermutationIterator<T> {
-        HeapPermutationIterator::new(self)
+    fn permutation(&'a mut self) -> Chain<IntoIter<Vec<T>>, HeapPermutationIterator<T>> {
+        let origin = vec![self.to_owned()];
+        origin.into_iter().chain(HeapPermutationIterator::new(self))
     }
 }
 
 /// Generate a sharable permutation inside `Rc<RefCell<&mut [T]>>`
 /// It return [HeapPermutationCellIter](struct.HeapPermutationCellIter.html)
+/// but it include an original value as first value return by `Iterator`.
+/// 
+/// # Breaking change from 0.3.x to 0.4
+/// Since version 0.4.0, the first result return by this iterator
+/// will be the original value
 impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a + Copy {
     /// Use [HeapPermutationCellIter](struct.HeapPermutationCellIter.html)
     /// as permutation generator
-    type Permutator = HeapPermutationCellIter<'a, T>;
+    type Permutator = Chain<IntoIter<()>, HeapPermutationCellIter<'a, T>>;
 
-    fn permutation(&'a mut self) -> HeapPermutationCellIter<T> {
-        HeapPermutationCellIter {
-            c : vec![0; self.borrow().len()],
-            data : Rc::clone(self),
-            i : 0
-        }
+    fn permutation(&'a mut self) -> Chain<IntoIter<()>, HeapPermutationCellIter<T>> {
+        let original = vec![()];
+        original.into_iter().chain(
+            HeapPermutationCellIter {
+                c : vec![0; self.borrow().len()],
+                data : Rc::clone(self),
+                i : 0
+            }
+        )
     }
 }
 
 /// Generate permutation a mutable pointer to slice of T
 /// It return [HeapPermutation](struct.HeapPermutationRefIter.html)
+/// but it include an original value as first value return by `Iterator`.
 /// 
 /// # Warning
 /// This implementation hid unsafe inside the permutation function but
 /// doesn't provide any additional safety. 
 /// User need to treat the return object as unsafe.
+/// 
+/// # Breaking change from 0.3.x to 0.4
+/// Since version 0.4.0, the first result return by this iterator
+/// will be the original value
 impl<'a, T> Permutation<'a> for *mut [T] where T : 'a + Copy {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = HeapPermutationRefIter<'a, T>;
+    type Permutator = Chain<IntoIter<()>, HeapPermutationRefIter<'a, T>>;
 
-    fn permutation(&'a mut self) -> HeapPermutationRefIter<T> {
+    fn permutation(&'a mut self) -> Chain<IntoIter<()>, HeapPermutationRefIter<T>> {
+        let original = vec![()];
         unsafe {
-            HeapPermutationRefIter {
-                c : vec![0; (**self).len()],
-                data : &mut (**self),
-                i : 0
-            }
+            original.into_iter().chain(
+                HeapPermutationRefIter {
+                    c : vec![0; (**self).len()],
+                    data : &mut (**self),
+                    i : 0
+                }
+            )
         }
     }
 }
@@ -5586,7 +5329,7 @@ pub mod test {
     #[test]
     fn test_heap_permutation_6() {
         let mut data = [1, 2, 3, 4, 5, 6];
-        let mut counter = 1;
+        let mut counter = 0;
         heap_permutation(&mut data, |_| {
             counter +=1;
         });
@@ -5598,7 +5341,7 @@ pub mod test {
     fn test_heap_permutation_10() {
         use std::time::{Instant};
         let mut data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut counter = 1;
+        let mut counter = 0;
         let timer = Instant::now();
         // println!("{:?}", data);
         heap_permutation(&mut data, |_| {
@@ -5872,7 +5615,7 @@ pub mod test {
         
         let mut counter = 0;
         let timer = Instant::now();
-        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];;
+        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];
         let mut result = vec![data[0][0]; data.len()];
         let shared = Rc::new(RefCell::new(result.as_mut_slice()));
 
@@ -5891,7 +5634,7 @@ pub mod test {
         
         let mut counter = 0;
         let timer = Instant::now();
-        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];;
+        let data : &[&[u8]]= &[&[1, 2], &[3, 4, 5, 6], &[7, 8, 9], &[10, 11, 12,], &[13, 14, 15], &[16, 17, 18, 19], &[20, 21, 22], &[23, 24, 25, 26, 27]];
         let mut result = vec![data[0][0]; data.len()];
         let shared = result.as_mut_slice() as *mut [u8];
 
@@ -6460,8 +6203,8 @@ pub mod test {
     #[test]
     fn test_permutation_trait() {
         let mut data = [1, 2, 3, 4, 5];
-        println!("{:?}", data);
-        let mut counter = 1;
+        // println!("{:?}", data);
+        let mut counter = 0;
         for permuted in data.permutation() {
             println!("{:?}", permuted);
             counter += 1;
@@ -6475,8 +6218,8 @@ pub mod test {
         let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
         let mut shared = Rc::new(RefCell::new(data));
         let value = Rc::clone(&shared);
-        println!("{:?}", &*shared.borrow());
-        let mut counter = 1;
+        // println!("{:?}", &*shared.borrow());
+        let mut counter = 0;
         shared.permutation().for_each(|_| {
             println!("{:?}", &*value.borrow());
             counter += 1;
@@ -6489,7 +6232,7 @@ pub mod test {
     fn test_permutation_trait_ref() {
         let data : &mut[i32] = &mut [1, 2, 3, 4, 5];
         let mut shared = data as *mut [i32];
-        let mut counter = 1;
+        let mut counter = 0;
         shared.permutation().for_each(|_| {
             println!("{:?}", data);
             counter += 1;
@@ -6505,8 +6248,8 @@ pub mod test {
         let mut counter = 0;
 
         data.combination(k).for_each(|mut combination| {
-            println!("{:?}", combination);
-            counter += 1;
+            // println!("{:?}", combination);
+            // counter += 1;
             combination.permutation().for_each(|permuted| {
                 println!("{:?}", permuted);
                 counter += 1;
@@ -6673,7 +6416,7 @@ pub mod test {
             }
         }
 
-        unsafe fn start_combination_process<'a>(data : &'a[i32], cur_result : *mut [i32], k : usize, consumers : Vec<Box<Consumer + 'a>>) {
+        unsafe fn start_combination_process<'a>(data : &'a[i32], cur_result : *mut [i32], k : usize, consumers : Vec<Box<dyn Consumer + 'a>>) {
             use std::time::Instant;
             let timer = Instant::now();
             let mut counter = 0;
@@ -6698,7 +6441,7 @@ pub mod test {
             let worker2 = Worker2 {
                 data : &result
             };
-            let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+            let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
             start_combination_process(data, shared, k, consumers);
         }
     }
@@ -6731,7 +6474,7 @@ pub mod test {
             }
         }
 
-        fn start_combination_process<'a>(data : &'a[i32], cur_result : Rc<RefCell<&'a mut[i32]>>, k : usize, consumers : Vec<Box<Consumer + 'a>>) {
+        fn start_combination_process<'a>(data : &'a[i32], cur_result : Rc<RefCell<&'a mut[i32]>>, k : usize, consumers : Vec<Box<dyn Consumer + 'a>>) {
             use std::time::Instant;
             let timer = Instant::now();
             let mut counter = 0;
@@ -6754,7 +6497,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&result_cell)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_combination_process(data, result_cell, k, consumers);
     }
 
@@ -6900,7 +6643,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&result_cell)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         let gosper = GosperCombinationCellIter::new(data, k, result_cell);
         let timer = Instant::now();
         let mut counter = 0;
@@ -6937,7 +6680,7 @@ pub mod test {
             }
         }
 
-        unsafe fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : *mut [i32], consumers : Vec<Box<Consumer + 'a>>) {
+        unsafe fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : *mut [i32], consumers : Vec<Box<dyn Consumer + 'a>>) {
             unsafe_cartesian_product(data, cur_result, || {
                 consumers.iter().for_each(|c| {
                     c.consume();
@@ -6957,7 +6700,7 @@ pub mod test {
             let worker2 = Worker2 {
                 data : &result
             };
-            let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+            let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
             start_cartesian_product_process(data, shared, consumers);
         }
     }
@@ -6987,7 +6730,7 @@ pub mod test {
             }
         }
 
-        unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [i32], consumers : Vec<Box<Consumer + 'a>>) {
+        unsafe fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : *mut [i32], consumers : Vec<Box<dyn Consumer + 'a>>) {
             use std::time::Instant;
             let timer = Instant::now();
             let mut counter = 0;
@@ -7014,7 +6757,7 @@ pub mod test {
             let worker2 = Worker2 {
                 data : &result
             };
-            let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+            let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
             start_cartesian_product_process(data, n, shared, consumers);
         }
     }
@@ -7043,7 +6786,7 @@ pub mod test {
             }
         }
 
-        fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+        fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<dyn Consumer + 'a>>) {
             cartesian_product_cell(data, cur_result, || {
                 consumers.iter().for_each(|c| {
                     c.consume();
@@ -7061,7 +6804,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&shared)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_cartesian_product_process(data, shared, consumers);
     }
     
@@ -7090,7 +6833,7 @@ pub mod test {
             }
         }
 
-        fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+        fn start_cartesian_product_process<'a>(data : &'a[i32], n : usize, cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<dyn Consumer + 'a>>) {
             self_cartesian_product_cell(data, n, cur_result, || {
                 consumers.iter().for_each(|c| {
                     c.consume();
@@ -7109,7 +6852,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&shared)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_cartesian_product_process(data, n, shared, consumers);
     
     }
@@ -7139,7 +6882,7 @@ pub mod test {
             }
         }
 
-        fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<Consumer + 'a>>) {
+        fn start_cartesian_product_process<'a>(data : &'a[&'a[i32]], cur_result : Rc<RefCell<&'a mut [i32]>>, consumers : Vec<Box<dyn Consumer + 'a>>) {
             let cart = CartesianProductCellIter::new(data, cur_result);
             for _ in cart {
                 consumers.iter().for_each(|c| {
@@ -7158,7 +6901,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&shared)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_cartesian_product_process(data, shared, consumers);
     
     }
@@ -7345,7 +7088,7 @@ pub mod test {
             }
         }
 
-        unsafe fn start_k_permutation_process<'a>(data : &'a[i32], cur_result : *mut [i32], k : usize, consumers : Vec<Box<Consumer + 'a>>) {
+        unsafe fn start_k_permutation_process<'a>(data : &'a[i32], cur_result : *mut [i32], k : usize, consumers : Vec<Box<dyn Consumer + 'a>>) {
             unsafe_k_permutation(data, k, cur_result, || {
                 consumers.iter().for_each(|c| {
                     c.consume();
@@ -7365,7 +7108,7 @@ pub mod test {
             let worker2 = Worker2 {
                 data : &result
             };
-            let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+            let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
             start_k_permutation_process(data, shared, k, consumers);
         }
     }
@@ -7394,7 +7137,7 @@ pub mod test {
             }
         }
 
-        fn start_k_permutation_process<'a>(data : &'a[i32], cur_result : Rc<RefCell<&'a mut [i32]>>, k : usize, consumers : Vec<Box<Consumer + 'a>>) {
+        fn start_k_permutation_process<'a>(data : &'a[i32], cur_result : Rc<RefCell<&'a mut [i32]>>, k : usize, consumers : Vec<Box<dyn Consumer + 'a>>) {
             use std::time::Instant;
             let timer = Instant::now();
             let mut counter = 0;
@@ -7418,7 +7161,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&shared)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         start_k_permutation_process(data, shared, k, consumers);
     }
 
@@ -7459,7 +7202,7 @@ pub mod test {
         let worker2 = Worker2 {
             data : Rc::clone(&shared)
         };
-        let consumers : Vec<Box<Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
+        let consumers : Vec<Box<dyn Consumer>> = vec![Box::new(worker1), Box::new(worker2)];
         
         let kperm = KPermutationCellIter::new(data, k, shared);
         let timer = Instant::now();
@@ -7632,7 +7375,7 @@ pub mod test {
             // It's k-permutation of size 3 over data.
             cp.combination(3).for_each(|mut c| { // need mut
                 // print the first 3-combination over data
-                println!("{:?}", c);
+                // println!("{:?}", c);
 
                 // start permute the 3-combination
                 c.permutation().for_each(|p| {

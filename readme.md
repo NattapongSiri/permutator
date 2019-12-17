@@ -12,7 +12,8 @@ domains.cart_prod().for_each(|cp| {
     cp.combination(3).for_each(|mut c| { // need mut
         // each `c` is not &[&&i32]
         // print the first 3-combination over data
-        println!("{:?}", c);
+        // No longer need this line from verion 0.4.0 onward
+        // println!("{:?}", c);
 
         // start permute the 3-combination
         c.permutation().for_each(|p| {
@@ -39,7 +40,8 @@ domains.cart_prod().for_each(|cp| {
     cp.combination(3).for_each(|mut c| { // need mut
         // each `c` is not &[i32]
         // print the first 3-combination over data
-        println!("{:?}", c);
+        // No longer need this line from verion 0.4.0 onward
+        // println!("{:?}", c);
 
         // start permute the 3-combination
         c.permutation().for_each(|p| {
@@ -54,9 +56,7 @@ domains.cart_prod().for_each(|cp| {
 });
 ```
 ## The `copy` module
-This crate split into two modules. One is root module which can be used in most of the case. Another is `copy` module which require that the type implement `Copy` trait. The root module return value as a collection of `&T`, except all Heap permutaiton family. The `copy` module always return value as a collection of `T`. There's no Heap permutation function in `copy` module because it did permutation in place. There's no copy nor create any reference.
-### Note
-All heap permutation iterators are also in "copy" module. This is because `K-Permutation` iterator family depends on `HeapPermutation` iterator family but `HeapPermutation` iterator family in root module doesn't require `T` to implement `Copy` trait while `K-Permutation` iterator family require `T` to implement `Copy` trait. However, both `copy` and root module do exactly the same operation. There's no copy nor borrow operation as the algorithm itself do permutation in place.
+This crate split into two modules. One is root module which can be used in most of the case. Another is `copy` module which require that the type implement `Copy` trait. The root module return value as a collection of `&T`, except all Heap permutaiton family. The `copy` module always return value as a collection of `T`. There's no Heap permutation in `copy` module because it did permutation in place. There's no copy nor create any reference.
 ## Get a permutation at specific point, not an iterator style.
 It crate provides 2 functions to get a cartesian product or k-permutation:
 - get_cartesian_for
@@ -147,11 +147,11 @@ There are three distinct implementation to get permutation.
 - Function that call callback function to return each permutation
 ### Iterator
 This crate provides `HeapPermutationIterator`, `HeapPermutationCellIter`, `HeapPermutationRefIter`, `XPermutationIterator`, `XPermutationCellIter`, and `XPermutationRefIter` structs in both root module and `copy` module that implement `Iterator`, `IteratorReset`, `ExactSizeIterator` traits. Each struct serves different use cases:-
-- `HeapPermutationIterator` can be used in any case that order is not important and performance is least concern.
+- `HeapPermutationIterator` can be used in any case that order is not important and performance is least concern. This iterator doesn't return original value as first value.
 - `XPermutationIterator` can be used in any case that order is important and performance is least concern.
-- `HeapPermutationCellIter` can be used in case that order is not important and performance is important as well as safety.
+- `HeapPermutationCellIter` can be used in case that order is not important and performance is important as well as safety. This iterator doesn't return original value as first value.
 - `XPermutationCellIter` can be used in case that order is important and performance is important as well as safety.
-- `HeapPermutationRefIter` can be used in case that order is not important, performance is critical and safety will be handle by caller.
+- `HeapPermutationRefIter` can be used in case that order is not important, performance is critical and safety will be handle by caller. This iterator doesn't return original value as first value.
 - `XPermutationRefIter` can be used in case that order is important, performance is critical and safety will be handle by caller.
 The different between root module and `copy` module is that in `copy` module type `T` need to implement `Copy` trait.
 Every structs implements `IteratorReset` trait.
@@ -160,12 +160,17 @@ Every structs implements `IteratorReset` trait.
 This crate provides `Permutation` trait in root module and `copy` module. It provide basic implementation various types such as generic slice, generic Vec, tuple of `(&'a mut[T], Rc<RefCell<&'a mut[T]>>`, and more type but used for [k-permutation](#get-a-k-permutation-from-data).
 It add `permutation()` function to it and return required iterator based on type of data. For example on generic Vec return `HeapPermutationIterator` but on `(&'a mut [T], Rc<RefCell<&'a mut[T]>>)` return `HeapPermutationCellIter`.
 The trait never return lexicographically ordered permutation iterator.
+It add one more benefit since version 0.4.0. Unlike constructing an iterator, it return a chained iterator. The chained is just a two iterator chained together. The first iterator return only one value, the original value. The second iterator return all the rest permutation.
 ### Callback function
 This crate provides 3 functions in root module that return non-lexicographically ordered result which serve different usecase.
 - `heap_permutation` function that return product as callback parameter
 - `heap_permutation_cell` function that return product into Rc<RefCell<>> given in function parameter
 - `heap_permutation_sync` function that return product into Arc<RwLock<>> given in function parameter
-**There is no heap permutation function family in `copy` module.**
+
+~~**There is no heap permutation function family in `copy` module.**~~
+
+**Since version 0.4.0 onward all heap permutation family including all Iterator style isn't in `copy` module.**  This is because Iterator need to return owned value and `HeapPermutationIterator` use `T` directly, not `&T`, so `T` need to implement `Clone`. This make implementation in `copy` module duplicate of the one in root module.
+
 This crate provides 4 functions in both root module and `copy` module that return lexicographically ordered result which serve different usecase.
 - `x_permutation` function that return lexicographically ordered product as callback parameter
 - `x_permutation_cell` function that return lexicographically ordered product into Rc<RefCell<>> given in function parameter
@@ -787,6 +792,27 @@ inside the buffer. The sender will block until the receiver read the data.
         start_k_permutation_process(data, result_sync, k, vec![t1_send, t2_send], main_recv);
     }).join().unwrap();
 ```
+## Breaking change from 0.3.x to 0.4
+trait `Permutation`, functions `heap_permutation`, `heap_permutation_cell`, and `heap_permutation_sync` now return the unpermuted value first instead of returning permuted once first.
+```Rust
+    use permutator::{
+        heap_permutation,
+        Permutation
+    };
+    let arr = &[1, 2, 3];
+    // no longer need to `println!("{:?}", arr);` first
+
+    heap_permutation(arr, |perm| {
+        // now it print [1, 2, 3], [2, 1, 3], ...
+        println!("{:?}", perm);
+    });
+
+    arr.permutation().for_each(|perm| {
+        // now it print [1, 2, 3], [2, 1, 3], ...
+        println!("{:?}", perm);
+    });
+```
+All usage on `permutator::copy::HeapPermutationIterator` shall become `permutator::HeapPermutationIterator`
 ## Breaking change from 0.2.x to 0.3.x
 `combination` from root module and `copy` module now return "Large" combination family.
 ### Rationale
