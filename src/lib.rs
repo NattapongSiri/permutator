@@ -122,10 +122,9 @@ extern crate num;
 use num::{PrimInt, Unsigned};
 use std::cell::RefCell;
 use std::collections::{VecDeque};
-use std::iter::{Chain, ExactSizeIterator, Product, Iterator};
+use std::iter::{Chain, ExactSizeIterator, Iterator, Product, Once, once};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
-use std::vec::{IntoIter};
 
 pub mod copy;
 
@@ -6144,10 +6143,10 @@ pub trait Permutation<'a> {
 impl<'a, T> Permutation<'a> for [T] where T : 'a + Clone {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = Chain<IntoIter<Vec<T>>, HeapPermutationIterator<'a, T>>;
+    type Permutator = Chain<Once<Vec<T>>, HeapPermutationIterator<'a, T>>;
 
-    fn permutation(&'a mut self) -> Chain<IntoIter<Vec<T>>, HeapPermutationIterator<T>> {
-        let origin = vec![self.to_owned()];
+    fn permutation(&'a mut self) -> Chain<Once<Vec<T>>, HeapPermutationIterator<T>> {
+        let origin = once(self.to_owned());
         origin.into_iter().chain(HeapPermutationIterator::new(self))
     }
 }
@@ -6162,10 +6161,10 @@ impl<'a, T> Permutation<'a> for [T] where T : 'a + Clone {
 impl<'a, T> Permutation<'a> for Vec<T> where T : 'a + Clone {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = Chain<IntoIter<Vec<T>>, HeapPermutationIterator<'a, T>>;
+    type Permutator = Chain<Once<Vec<T>>, HeapPermutationIterator<'a, T>>;
 
-    fn permutation(&'a mut self) -> Chain<IntoIter<Vec<T>>, HeapPermutationIterator<T>> {
-        let origin = vec![self.to_owned()];
+    fn permutation(&'a mut self) -> Chain<Once<Vec<T>>, HeapPermutationIterator<T>> {
+        let origin = once(self.to_owned());
         origin.into_iter().chain(HeapPermutationIterator::new(self))
     }
 }
@@ -6180,10 +6179,10 @@ impl<'a, T> Permutation<'a> for Vec<T> where T : 'a + Clone {
 impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a {
     /// Use [HeapPermutationCellIter](struct.HeapPermutationCellIter.html)
     /// as permutation generator
-    type Permutator = Chain<IntoIter<()>, HeapPermutationCellIter<'a, T>>;
+    type Permutator = Chain<Once<()>, HeapPermutationCellIter<'a, T>>;
 
-    fn permutation(&'a mut self) -> Chain<IntoIter<()>, HeapPermutationCellIter<T>> {
-        let original = vec![()];
+    fn permutation(&'a mut self) -> Chain<Once<()>, HeapPermutationCellIter<T>> {
+        let original = once(());
         original.into_iter().chain(
             HeapPermutationCellIter {
                 c : vec![0; self.borrow().len()],
@@ -6209,10 +6208,10 @@ impl<'a, T> Permutation<'a> for Rc<RefCell<&'a mut[T]>> where T :'a {
 impl<'a, T> Permutation<'a> for *mut [T] where T : 'a + Clone {
     /// Use [HeapPermutation](struct.HeapPermutationIterator.html)
     /// as permutation generator
-    type Permutator = Chain<IntoIter<()>, HeapPermutationRefIter<'a, T>>;
+    type Permutator = Chain<Once<()>, HeapPermutationRefIter<'a, T>>;
 
-    fn permutation(&'a mut self) -> Chain<IntoIter<()>, HeapPermutationRefIter<T>> {
-        let original = vec![()];
+    fn permutation(&'a mut self) -> Chain<Once<()>, HeapPermutationRefIter<T>> {
+        let original = once(());
         unsafe {
             original.into_iter().chain(
                 HeapPermutationRefIter {
