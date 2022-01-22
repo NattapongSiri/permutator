@@ -5476,7 +5476,7 @@ impl<'a, T> SelfCartesianProductIterator<'a, T> where T : 'a {
     pub fn new(domain : &'a[T], n : usize) -> SelfCartesianProductIterator<'a, T> {
 
         SelfCartesianProductIterator {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -5599,7 +5599,7 @@ impl<'a, T> SelfCartesianProductCellIter<'a, T> where T : 'a {
     pub fn new(domain : &'a[T], n : usize, result : Rc<RefCell<&'a mut [&'a T]>>) -> SelfCartesianProductCellIter<'a, T> {
 
         SelfCartesianProductCellIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -5723,7 +5723,7 @@ impl<'a, T> SelfCartesianProductRefIter<'a, T> where T : 'a {
     pub unsafe fn new(domain : &'a[T], n : usize, result : * mut [&'a T]) -> SelfCartesianProductRefIter<'a, T> {
 
         SelfCartesianProductRefIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -9266,8 +9266,24 @@ pub mod test {
     #[test]
     #[allow(unused)]
     fn test_case_15() {
+        // https://github.com/NattapongSiri/permutator/issues/15
         let mut a = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
         for mut _c in a.combination(2) {
+        }
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_case_16() {
+        // https://github.com/NattapongSiri/permutator/issues/16
+        let data = [0, 1];
+        // expected
+        for x in CartesianProductIterator::new(&[&data[..]; 3][..]) {
+            // println!("{:?}", x);
+        }
+        // panics
+        for x in SelfCartesianProductIterator::new(&data, 3) {
+            // println!("{:?}", x);
         }
     }
 }

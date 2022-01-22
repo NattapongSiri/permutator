@@ -3801,7 +3801,7 @@ impl<'a, T> SelfCartesianProductIterator<'a, T> where T : 'a + Copy {
     pub fn new(domain : &'a[T], n : usize) -> SelfCartesianProductIterator<'a, T> {
 
         SelfCartesianProductIterator {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -3924,7 +3924,7 @@ impl<'a, T> SelfCartesianProductCellIter<'a, T> where T : 'a + Copy {
     pub fn new(domain : &'a[T], n : usize, result : Rc<RefCell<&'a mut [T]>>) -> SelfCartesianProductCellIter<'a, T> {
 
         SelfCartesianProductCellIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -4048,7 +4048,7 @@ impl<'a, T> SelfCartesianProductRefIter<'a, T> where T : 'a + Copy {
     pub unsafe fn new(domain : &'a[T], n : usize, result : * mut [T]) -> SelfCartesianProductRefIter<'a, T> {
 
         SelfCartesianProductRefIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
