@@ -7,7 +7,7 @@ keywords = ["cartesian", "permutation", "combination", "multiple", "k-permutatio
 license = "BSD-3-Clause"
 readme = "readme.md"
 repository = "https://github.com/NattapongSiri/permutator"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Nattapong Sirilappanich <s.nattapong@gmail.com>"]
 edition = "2018"
 

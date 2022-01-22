@@ -3765,7 +3765,7 @@ impl<'a, T> LargeCombinationIterator<'a, T> {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             result : result
         }
@@ -3996,7 +3996,7 @@ impl<'a, T> LargeCombinationRefIter<'a, T> {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
 
             result : &mut *result
@@ -9261,5 +9261,13 @@ pub mod test {
         });
 
         println!("Done {} heap_permutation in {:?}", counter, timer.elapsed());
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_case_15() {
+        let mut a = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+        for mut _c in a.combination(2) {
+        }
     }
 }
