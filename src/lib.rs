@@ -2289,7 +2289,7 @@ fn _x_permutation_core<T>(d : &[T], mut result_fn : impl FnMut(usize, usize), mu
         let k = 1;
 
         (a, k, l, n, u)
-    };
+    }
 
     /// Return tuple of (p, q) where
     /// p = 0 and q = l[0]
@@ -3175,7 +3175,7 @@ impl<'a, T> GosperCombinationIterator<'a, T> {
         let n = data.len();
         GosperCombinationIterator {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x
         }
@@ -3330,7 +3330,7 @@ impl<'a, T> GosperCombinationCellIter<'a, T> {
         let n = data.len();
         GosperCombinationCellIter {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x,
 
@@ -3515,7 +3515,7 @@ impl<'a, T> GosperCombinationRefIter<'a, T> {
         let n = data.len();
         GosperCombinationRefIter {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x,
 
@@ -3874,7 +3874,7 @@ impl<'a, T> LargeCombinationCellIter<'a, T> {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
 
             result : result
