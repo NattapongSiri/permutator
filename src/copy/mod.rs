@@ -61,7 +61,6 @@ use super::{
     heap_permutation,
     heap_permutation_cell,
     heap_permutation_sync,
-    multiply_factorial,
     stanford_combination};
 
 /// Get a cartesian product at specific location.
@@ -2614,7 +2613,7 @@ impl<'a, T> GosperCombinationIterator<'a, T> where T : Copy {
         let n = data.len();
         GosperCombinationIterator {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x
         }
@@ -2692,7 +2691,7 @@ impl<'a, T> IteratorReset for CombinationIterator<'a, T> where T : Copy {
 impl<'a, T> ExactSizeIterator for CombinationIterator<'a, T> where T : Copy {
     fn len(&self) -> usize {
         let n = self.data.len();
-        divide_factorial(n, multiply_factorial(n - self.r, self.r))
+        divide_factorial(n, n - self.r) / factorial(self.r)
     }
 }
 
@@ -2765,7 +2764,7 @@ impl<'a, T> GosperCombinationCellIter<'a, T> where T : Copy{
         let n = data.len();
         GosperCombinationCellIter {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x,
 
@@ -2842,7 +2841,7 @@ impl<'a, T> IteratorReset for CombinationCellIter<'a, T> where T : Copy {
 impl<'a, T> ExactSizeIterator for CombinationCellIter<'a, T> where T : Copy {
     fn len(&self) -> usize {
         let n = self.data.len();
-        divide_factorial(n, multiply_factorial(n - self.r, self.r))
+        divide_factorial(n, n - self.r) / factorial(self.r)
     }
 }
 
@@ -2930,7 +2929,7 @@ impl<'a, T> GosperCombinationRefIter<'a, T> where T : Copy {
         let n = data.len();
         GosperCombinationRefIter {
             data : data,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             x : x,
 
@@ -3007,7 +3006,7 @@ impl<'a, T> IteratorReset for CombinationRefIter<'a, T> where T : Copy {
 impl<'a, T> ExactSizeIterator for CombinationRefIter<'a, T> where T : Copy {
     fn len(&self) -> usize {
         let n = self.data.len();
-        divide_factorial(n, multiply_factorial(n - self.r, self.r))
+        divide_factorial(n, n - self.r) / factorial(self.r)
     }
 }
 
@@ -3065,7 +3064,7 @@ impl<'a, T> LargeCombinationIterator<'a, T> where T : 'a + Copy {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
             result : result
         }
@@ -3175,7 +3174,7 @@ impl<'a, T> LargeCombinationCellIter<'a, T> where T : 'a + Copy {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
 
             result : result
@@ -3298,7 +3297,7 @@ impl<'a, T> LargeCombinationRefIter<'a, T> where T : 'a + Copy {
             data : data,
             i : 0,
             nexted : None,
-            len : divide_factorial(n, multiply_factorial(n - r, r)),
+            len : divide_factorial(n, n - r) / factorial(r),
             r : r,
 
             result : &mut *result
@@ -3802,7 +3801,7 @@ impl<'a, T> SelfCartesianProductIterator<'a, T> where T : 'a + Copy {
     pub fn new(domain : &'a[T], n : usize) -> SelfCartesianProductIterator<'a, T> {
 
         SelfCartesianProductIterator {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -3925,7 +3924,7 @@ impl<'a, T> SelfCartesianProductCellIter<'a, T> where T : 'a + Copy {
     pub fn new(domain : &'a[T], n : usize, result : Rc<RefCell<&'a mut [T]>>) -> SelfCartesianProductCellIter<'a, T> {
 
         SelfCartesianProductCellIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
@@ -4049,7 +4048,7 @@ impl<'a, T> SelfCartesianProductRefIter<'a, T> where T : 'a + Copy {
     pub unsafe fn new(domain : &'a[T], n : usize, result : * mut [T]) -> SelfCartesianProductRefIter<'a, T> {
 
         SelfCartesianProductRefIter {
-            c : vec![0; domain.len()],
+            c : vec![0; n],
             domain : domain,
             exhausted : false,
             i : 0,
