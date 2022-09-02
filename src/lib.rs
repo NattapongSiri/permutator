@@ -3714,15 +3714,19 @@ fn _large_comb_next_core<'a, T, R, V>(
 
 /// Create a combination iterator.
 /// The result is lexicographic ordered if input is lexicorgraphic ordered.
-/// The returned combination will be a reference into given data.
-/// Each combination return from iterator will be a new Vec.
+/// The returned combination will be a reference into the given data.
+/// Each combination returned from iterator will be a new Vec.
 /// It's safe to hold onto a combination or `collect` it.
 /// 
 /// # Examples
-/// Given slice of [1, 2, 3, 4, 5]. It will produce following
-/// combinations:
+/// Given slice of `[1, 2, 3, 4, 5]` and the combination size of 3,
+/// it will produce the following combinations:
+///
+/// ```
 /// [1, 2, 3], [1, 2, 4], [1, 3, 4], [2, 3, 4], [1, 2, 5],
 /// [1, 3, 5], [2, 3, 5], [1, 4, 5], [2, 4, 5], [3, 4, 5]
+/// ```
+///
 /// Here's an example of code printing above combination.
 /// ```
 ///    use permutator::LargeCombinationIterator;
@@ -3739,8 +3743,9 @@ fn _large_comb_next_core<'a, T, R, V>(
 ///    println!("Total {} combinations in {:?}", counter, timer.elapsed());
 /// ```
 /// 
-/// # Panic
-/// It panic if `r == 0` or `r > data.len()`
+/// # Panics
+/// The `LargeCombinationIterator::new` function panics if the required combination size (`r`)
+/// is 0 or larger than the input data (`r > data.len()`).
 pub struct LargeCombinationIterator<'a, T> where T : 'a {
     c : Vec<usize>, // cursor for each combination slot
     data : &'a [T], // data to generate a combination
@@ -6002,8 +6007,12 @@ pub trait Combination<'a> {
     /// See [LargeCombinationIterator](struct.LargeCombinationIterator.html) for
     /// how to use [LargeCombinationIterator](struct.LargeCombinationIterator.html)
     /// 
-    /// # Return
+    /// # Returns
     /// A new family of [LargeCombinationIterator<T>](struct.LargeCombinationIterator.html)
+    ///
+    /// # Panics
+    /// The function panics if the required combination size (`k`) is 0,
+    /// or larger than the input data (`k > self.len()`).
     fn combination(&'a self, k : usize) -> Self::Combinator;
 }
 
